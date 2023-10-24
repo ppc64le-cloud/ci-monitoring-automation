@@ -8,6 +8,9 @@ from datetime import datetime
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+with open('config.json') as config_file:
+    config_data = json.load(config_file)
+
 def get_current_date():
     return datetime.now().date()
 
@@ -18,7 +21,7 @@ def parse_job_date(da):
 
 def get_jobs(s):
     
-    print("----------------------------------------------------------------------------------------------")
+    # print("----------------------------------------------------------------------------------------------")
     response = requests.get(s, verify=False)
     # print(response.text)
     if response.status_code == 200:
@@ -64,21 +67,28 @@ def get_jobs(s):
 def cluster_deploy_status(spy_link):
     job_type,job_platform = job_classifier(spy_link)
     job_log_url = 'https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs' + spy_link[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/finished.json'
+    #print(job_log_url)
     response = requests.get(job_log_url, verify=False)
     cluster_status = json.loads(response.text)
     return cluster_status["result"]
 
 def job_classifier(spy_link):
+
+    pattern = r'ocp.*?/'
+    match = re.search(pattern,spy_link)
+
+    if match:
+        job_type = match.group(0)
+        job_type = job_type.rstrip('/')
+        # print(job_type)
+    else:
+        print("not found")
+
     if spy_link.find("powervs") != -1:
         job_platform = "powervs"
-        job_type = "ocp-e2e-ovn-ppc64le-powervs"
         return job_type,job_platform
     elif spy_link.find("libvirt") != -1:
         job_platform = "libvirt"
-        if spy_link.find("upgrade") != -1:
-            job_type='ocp-ovn-remote-libvirt-ppc64le'
-        else:
-            job_type='ocp-e2e-ovn-remote-libvirt-ppc64le'
         return job_type,job_platform
     else:
         return 1
@@ -107,19 +117,34 @@ def get_failed_e2e_testcases(spy_link,job_type):
         print("error")
 
 
-def temporary_main_function():
-    url_set = ['https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/periodic-ci-openshift-multiarch-master-nightly-4.15-ocp-e2e-ovn-ppc64le-powervs']    
-    for url in url_set:
-        job_list = get_jobs(url) 
-        for job in job_list:
-            cluster_status=cluster_deploy_status(job["SpyglassLink"])
-            print(job,cluster_status)
-            if cluster_status == 'SUCCESS':
-                b,c = job_classifier(job["SpyglassLink"])
-                e2e_failures = get_failed_e2e_testcases(job["SpyglassLink"],b)
-                print(e2e_failures)
-            else:
-                print("cluster Installation failure")
-                #write function analyze cluster installation failures
+def temporary_main_function(prow_ci_data):
 
-temporary_main_function()
+    j=0
+    for url in prow_ci_data["prow_ci_links"]:
+        print(prow_ci_data["prow_ci_names"][j])
+        j=j+1
+        job_list = get_jobs(url)
+        i=0
+        print("-------------------------------------------------------------------------------------------------")
+
+        for job in job_list:
+            
+            cluster_status=cluster_deploy_status(job["SpyglassLink"])
+            i=i+1
+            if cluster_status == 'SUCCESS':
+                job_type,_ = job_classifier(job["SpyglassLink"])
+                e2e_failures = get_failed_e2e_testcases(job["SpyglassLink"],job_type)
+                print(i,". Job ID: ",job["ID"],"Cluster Creation Success")
+                if not e2e_failures:
+                    print("All test cases passed")
+                else:
+                    print("Failed testcases: ")
+                    for e in e2e_failures:
+                        print(e["Test"]["Name"])
+            else:
+                print(i,". Job ID: ",job["ID"],"Cluster Creation Failed")
+            print("\n")
+                #write function analyze cluster installation failures
+        print("--------------------------------------------------------------------------------------------------")
+
+temporary_main_function(config_data)
