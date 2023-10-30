@@ -67,10 +67,27 @@ def get_jobs(s):
 def cluster_deploy_status(spy_link):
     job_type,job_platform = job_classifier(spy_link)
     job_log_url = 'https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs' + spy_link[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/finished.json'
-    #print(job_log_url)
+    # print(job_log_url)
     response = requests.get(job_log_url, verify=False)
     cluster_status = json.loads(response.text)
     return cluster_status["result"]
+
+def get_quota(spy_link):
+    _,job_platform = job_classifier(spy_link)
+    #print(job_log_url)
+    zone_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/build-log.txt"
+    if job_platform == "libvirt":
+        job_platform+="-ppc64le"
+    elif job_platform == "powervs":
+        job_platform+="-[1-9]"
+    #print (job_platform)
+    zone_log_re = re.compile('(Acquired 1 lease\(s\) for {}-quota-slice: \[)([^]]+)(\])'.format(job_platform), re.MULTILINE|re.DOTALL)
+    response = requests.get(zone_log_url, verify=False)
+    zone_log_match = zone_log_re.search(response.text)
+    if zone_log_match is None:
+        return None
+    else:
+        return zone_log_match.group(2)
 
 def job_classifier(spy_link):
 
@@ -80,7 +97,7 @@ def job_classifier(spy_link):
     if match:
         job_type = match.group(0)
         job_type = job_type.rstrip('/')
-        # print(job_type)
+        #print(job_type)
     else:
         print("not found")
 
@@ -122,27 +139,37 @@ def temporary_main_function(prow_ci_data):
     j=0
     for url in prow_ci_data["prow_ci_links"]:
         print(prow_ci_data["prow_ci_names"][j])
-        j=j+1
         job_list = get_jobs(url)
         i=0
         print("-------------------------------------------------------------------------------------------------")
-
+        if len(job_list) == 0:
+            print ("No job runs on {} today".format(prow_ci_data["prow_ci_names"][j]))
+        j=j+1
+        deploy_count = 0
+        e2e_count = 0
         for job in job_list:
             
             cluster_status=cluster_deploy_status(job["SpyglassLink"])
             i=i+1
+            print(i,". Job ID: ",job["ID"])
+            quota=get_quota(job["SpyglassLink"])
+            print("Lease Quota-", quota)
             if cluster_status == 'SUCCESS':
+                deploy_count += 1
                 job_type,_ = job_classifier(job["SpyglassLink"])
                 e2e_failures = get_failed_e2e_testcases(job["SpyglassLink"],job_type)
-                print(i,". Job ID: ",job["ID"],"Cluster Creation Success")
+                print("Cluster Creation Success")
                 if not e2e_failures:
+                    e2e_count += 1
                     print("All test cases passed")
                 else:
                     print("Failed testcases: ")
                     for e in e2e_failures:
                         print(e["Test"]["Name"])
             else:
-                print(i,". Job ID: ",job["ID"],"Cluster Creation Failed")
+                print("Cluster Creation Failed")
+            print ("\n{}/{} deploys succeeded".format(deploy_count, len(job_list)))
+            print ("{}/{} e2e tests succeeded".format(e2e_count, len(job_list)))
             print("\n")
                 #write function analyze cluster installation failures
         print("--------------------------------------------------------------------------------------------------")
