@@ -21,7 +21,7 @@ def parse_job_date(da):
 
 def get_jobs(s):
     
-    response = requests.get(s, verify=False)
+    response = requests.get(s, verify=False, timeout=15)
     
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -67,7 +67,7 @@ def cluster_deploy_status(spy_link):
     job_type,job_platform = job_classifier(spy_link)
     job_log_url = 'https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs' + spy_link[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/finished.json'
 
-    response = requests.get(job_log_url, verify=False)
+    response = requests.get(job_log_url, verify=False, timeout=15)
     if response.status_code == 200:
         try:
             cluster_status = json.loads(response.text)
@@ -77,22 +77,49 @@ def cluster_deploy_status(spy_link):
     else:
         return 'ERROR'
 
-def get_quota(spy_link):
+def get_quota_and_nightly(spy_link):
     _,job_platform = job_classifier(spy_link)
 
-    zone_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/build-log.txt"
+    build_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/build-log.txt"
     if job_platform == "libvirt":
         job_platform+="-ppc64le"
     elif job_platform == "powervs":
         job_platform+="-[1-9]"
 
     zone_log_re = re.compile('(Acquired 1 lease\(s\) for {}-quota-slice: \[)([^]]+)(\])'.format(job_platform), re.MULTILINE|re.DOTALL)
-    response = requests.get(zone_log_url, verify=False)
-    zone_log_match = zone_log_re.search(response.text)
+    build_log_response = requests.get(build_log_url, verify=False, timeout=15)
+    zone_log_match = zone_log_re.search(build_log_response.text)
     if zone_log_match is None:
-        return None
+        print("Failed to fetch lease information")
     else:
-        return zone_log_match.group(2)
+        print("Lease Quota-",zone_log_match.group(2))
+    # Fetch the nightly information for non-upgrade jobs
+    if "upgrade" not in build_log_url:
+        nightly_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
+        nightly_log_match = nightly_log_re.search(build_log_response.text)
+        if nightly_log_match is None:
+            rc_nightly_log_re = re.compile('(Using explicitly provided pull-spec for release ppc64le-latest \((\S+)\))', re.MULTILINE|re.DOTALL)
+            rc_nightly_log_match = rc_nightly_log_re.search(build_log_response.text)
+            if rc_nightly_log_match is None:
+                print ("Unable to fetch nightly information- No match found")
+            else:
+                print(rc_nightly_log_match.group(2))
+        else:
+            print("ppc64le-latest-",nightly_log_match.group(2))
+    # Fetch nightly information for upgrade jobs- fetch both ppc64le-initial and ppc64le-latest
+    else:
+        nightly_initial_log_re = re.compile('(Resolved release ppc64le-initial to (\S+))', re.MULTILINE|re.DOTALL)
+        nightly_initial_log_match = nightly_initial_log_re.search(build_log_response.text)
+        if nightly_initial_log_match is None:
+            print ("Unable to fetch nightly ppc64le-initial information- No match found")
+        else:
+            print("ppc64le-initial-",nightly_initial_log_match.group(2))
+        nightly_latest_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
+        nightly_latest_log_match = nightly_latest_log_re.search(build_log_response.text)
+        if nightly_latest_log_match is None:
+            print ("Unable to fetch nightly ppc64le-latest information- No match found")
+        else:
+            print("ppc64le-latest-",nightly_latest_log_match.group(2))
 
 def job_classifier(spy_link):
 
@@ -114,7 +141,7 @@ def job_classifier(spy_link):
 def get_failed_monitor_testcases(spy_link,job_type):
     test_log_junit_dir_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/"
 
-    response = requests.get(test_log_junit_dir_url, verify=False)
+    response = requests.get(test_log_junit_dir_url, verify=False, timeout=15)
 
     if response.status_code == 200:
         monitor_test_failure_summary_filename_re = re.compile('(test-failures-summary_monitor_2[^.]*\.json)')
@@ -123,7 +150,7 @@ def get_failed_monitor_testcases(spy_link,job_type):
         if monitor_test_failure_summary_filename_match is not None:
             monitor_test_failure_summary_filename_str = monitor_test_failure_summary_filename_match.group(1)
             test_log_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/" + monitor_test_failure_summary_filename_str
-            response_2 = requests.get(test_log_url,verify=False)
+            response_2 = requests.get(test_log_url,verify=False, timeout=15)
             if response_2.status_code == 200:
                 try:
                     data = response_2.json()
@@ -143,7 +170,7 @@ def get_failed_e2e_testcases(spy_link,job_type):
 
     test_log_junit_dir_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/"
 
-    response = requests.get(test_log_junit_dir_url, verify=False)
+    response = requests.get(test_log_junit_dir_url, verify=False, timeout=15)
 
     if response.status_code == 200:
         test_failure_summary_filename_re = re.compile('(test-failures-summary_2[^.]*\.json)')
@@ -152,7 +179,7 @@ def get_failed_e2e_testcases(spy_link,job_type):
         if test_failure_summary_filename_match is not None:
             test_failure_summary_filename_str = test_failure_summary_filename_match.group(1)
             test_log_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/" + test_failure_summary_filename_str
-            response_2 = requests.get(test_log_url,verify=False)
+            response_2 = requests.get(test_log_url,verify=False, timeout=15)
             if response_2.status_code == 200:
                 try:
                     data = response_2.json()
@@ -165,32 +192,37 @@ def get_failed_e2e_testcases(spy_link,job_type):
         else:
             return 'ERROR'
     else:
-        return 'ERROR'
-
+        return 'ERROR' 
 
 def print_e2e_testcase_failures(spylink,jobtype):
+    e2e_result = False
     e2e_failures = get_failed_e2e_testcases(spylink,jobtype)
     if e2e_failures != 'ERROR':
         if not e2e_failures:
-            print("All test cases passed")
+            print("All e2e conformance test cases passed")
+            e2e_result = True
         else:
-            print("Failed origin testcases: ")
+            print("Failed conformance testcases: ")
             for e in e2e_failures:
                 print(e["Test"]["Name"])
     else:
         print("ERROR: Could not find test-failures-summary_*.json…")
+    return e2e_result
 
-def print_moinitor_testcase_failures(spylink,jobtype):
+def print_monitor_testcase_failures(spylink,jobtype):
+    e2e_result = False
     monitor_e2e_failures = get_failed_monitor_testcases(spylink,jobtype)
     if monitor_e2e_failures != 'ERROR':
         if not monitor_e2e_failures:
             print("All monitor test cases passed")
+            e2e_result = True
         else:
             print("Failed monitor testcases: ")
             for e in monitor_e2e_failures:
                 print(e["Test"]["Name"])
     else:
         print("ERROR: Could not find test-failures-summary_monitor_*.json…")
+    return e2e_result
 
 
 def temporary_main_function(prow_ci_data):
@@ -214,32 +246,33 @@ def temporary_main_function(prow_ci_data):
         deploy_count = 0
         e2e_count = 0
         for job in job_list:
-            
+            e2e_test_result = e2e_monitor_result = False
             cluster_status=cluster_deploy_status(job["SpyglassLink"])
             i=i+1
             print(i,". Job ID: ",job["ID"])
-            quota=get_quota(job["SpyglassLink"])
-            print("Lease Quota-", quota)
+            get_quota_and_nightly(job["SpyglassLink"])
 
             if cluster_status == 'SUCCESS' and sep == False:
                 deploy_count += 1
-                e2e_count += 1
                 job_type,_ = job_classifier(job["SpyglassLink"])
-                print_e2e_testcase_failures(job["SpyglassLink"],job_type)
+                e2e_test_result = print_e2e_testcase_failures(job["SpyglassLink"],job_type)
+                if e2e_test_result:
+                    e2e_count += 1
             
             elif cluster_status == 'SUCCESS' and sep == True:
                 deploy_count += 1
-                e2e_count += 1
                 job_type,_ = job_classifier(job["SpyglassLink"])
-                print_e2e_testcase_failures(job["SpyglassLink"],job_type)
-                print_moinitor_testcase_failures(job["SpyglassLink"],job_type)
+                e2e_test_result = print_e2e_testcase_failures(job["SpyglassLink"],job_type)
+                e2e_monitor_result = print_monitor_testcase_failures(job["SpyglassLink"],job_type)
+                if e2e_test_result and e2e_monitor_result:
+                    e2e_count += 1
                 
             elif cluster_status == 'FAILURE':
                 print("Cluster Creation Failed")
             
             elif cluster_status == 'ERROR':
                 print('Unable to get cluster status please check prowCI UI ')
-            
+
             print("\n")
 
         if len(job_list) != 0:
