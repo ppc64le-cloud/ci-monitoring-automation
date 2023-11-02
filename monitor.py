@@ -21,9 +21,8 @@ def parse_job_date(da):
 
 def get_jobs(s):
     
-    # print("----------------------------------------------------------------------------------------------")
     response = requests.get(s, verify=False)
-    # print(response.text)
+    
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, 'html.parser')
         script_elements = soup.find_all('script')
@@ -67,20 +66,26 @@ def get_jobs(s):
 def cluster_deploy_status(spy_link):
     job_type,job_platform = job_classifier(spy_link)
     job_log_url = 'https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs' + spy_link[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/finished.json'
-    # print(job_log_url)
+
     response = requests.get(job_log_url, verify=False)
-    cluster_status = json.loads(response.text)
-    return cluster_status["result"]
+    if response.status_code == 200:
+        try:
+            cluster_status = json.loads(response.text)
+            return cluster_status["result"]
+        except json.JSONDecodeError as e:
+            return 'ERROR'
+    else:
+        return 'ERROR'
 
 def get_quota(spy_link):
     _,job_platform = job_classifier(spy_link)
-    #print(job_log_url)
+
     zone_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/build-log.txt"
     if job_platform == "libvirt":
         job_platform+="-ppc64le"
     elif job_platform == "powervs":
         job_platform+="-[1-9]"
-    #print (job_platform)
+
     zone_log_re = re.compile('(Acquired 1 lease\(s\) for {}-quota-slice: \[)([^]]+)(\])'.format(job_platform), re.MULTILINE|re.DOTALL)
     response = requests.get(zone_log_url, verify=False)
     zone_log_match = zone_log_re.search(response.text)
@@ -97,9 +102,6 @@ def job_classifier(spy_link):
     if match:
         job_type = match.group(0)
         job_type = job_type.rstrip('/')
-        #print(job_type)
-    else:
-        print("not found")
 
     if spy_link.find("powervs") != -1:
         job_platform = "powervs"
@@ -107,37 +109,101 @@ def job_classifier(spy_link):
     elif spy_link.find("libvirt") != -1:
         job_platform = "libvirt"
         return job_type,job_platform
+
+
+def get_failed_monitor_testcases(spy_link,job_type):
+    test_log_junit_dir_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/"
+
+    response = requests.get(test_log_junit_dir_url, verify=False)
+
+    if response.status_code == 200:
+        monitor_test_failure_summary_filename_re = re.compile('(test-failures-summary_monitor_2[^.]*\.json)')
+        monitor_test_failure_summary_filename_match = monitor_test_failure_summary_filename_re.search(response.text, re.MULTILINE|re.DOTALL)
+        
+        if monitor_test_failure_summary_filename_match is not None:
+            monitor_test_failure_summary_filename_str = monitor_test_failure_summary_filename_match.group(1)
+            test_log_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/" + monitor_test_failure_summary_filename_str
+            response_2 = requests.get(test_log_url,verify=False)
+            if response_2.status_code == 200:
+                try:
+                    data = response_2.json()
+                    e2e_failure_list = data['Tests']
+                    return e2e_failure_list
+                except json.JSONDecodeError as e:
+                    return 'ERROR'
+            else:
+                return 'ERROR'
+        else:
+            return 'ERROR'
     else:
-        return 1
+        return 'ERROR'
+
 
 def get_failed_e2e_testcases(spy_link,job_type):
 
     test_log_junit_dir_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/"
 
     response = requests.get(test_log_junit_dir_url, verify=False)
+
     if response.status_code == 200:
         test_failure_summary_filename_re = re.compile('(test-failures-summary_2[^.]*\.json)')
         test_failure_summary_filename_match = test_failure_summary_filename_re.search(response.text, re.MULTILINE|re.DOTALL)
+        
         if test_failure_summary_filename_match is not None:
             test_failure_summary_filename_str = test_failure_summary_filename_match.group(1)
             test_log_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/" + test_failure_summary_filename_str
             response_2 = requests.get(test_log_url,verify=False)
             if response_2.status_code == 200:
-                data = response_2.json()
-                e2e_failure_list = data['Tests']
-                return e2e_failure_list
+                try:
+                    data = response_2.json()
+                    e2e_failure_list = data['Tests']
+                    return e2e_failure_list
+                except json.JSONDecodeError as e:
+                    return 'ERROR'
             else:
-                print("error parsing data")
+                return 'ERROR'
         else:
-            print("ERROR: Could not find test-failures-summary_*.json?")
+            return 'ERROR'
     else:
-        print("error")
+        return 'ERROR'
+
+
+def print_e2e_testcase_failures(spylink,jobtype):
+    e2e_failures = get_failed_e2e_testcases(spylink,jobtype)
+    if e2e_failures != 'ERROR':
+        if not e2e_failures:
+            print("All test cases passed")
+        else:
+            print("Failed origin testcases: ")
+            for e in e2e_failures:
+                print(e["Test"]["Name"])
+    else:
+        print("ERROR: Could not find test-failures-summary_*.json…")
+
+def print_moinitor_testcase_failures(spylink,jobtype):
+    monitor_e2e_failures = get_failed_monitor_testcases(spylink,jobtype)
+    if monitor_e2e_failures != 'ERROR':
+        if not monitor_e2e_failures:
+            print("All monitor test cases passed")
+        else:
+            print("Failed monitor testcases: ")
+            for e in monitor_e2e_failures:
+                print(e["Test"]["Name"])
+    else:
+        print("ERROR: Could not find test-failures-summary_monitor_*.json…")
 
 
 def temporary_main_function(prow_ci_data):
 
     j=0
+    
     for url in prow_ci_data["prow_ci_links"]:
+
+        if "4.15" in url:
+            sep = True
+        else:
+            sep = False
+
         print(prow_ci_data["prow_ci_names"][j])
         job_list = get_jobs(url)
         i=0
@@ -154,24 +220,34 @@ def temporary_main_function(prow_ci_data):
             print(i,". Job ID: ",job["ID"])
             quota=get_quota(job["SpyglassLink"])
             print("Lease Quota-", quota)
-            if cluster_status == 'SUCCESS':
+
+            if cluster_status == 'SUCCESS' and sep == False:
                 deploy_count += 1
+                e2e_count += 1
                 job_type,_ = job_classifier(job["SpyglassLink"])
-                e2e_failures = get_failed_e2e_testcases(job["SpyglassLink"],job_type)
-                print("Cluster Creation Success")
-                if not e2e_failures:
-                    e2e_count += 1
-                    print("All test cases passed")
-                else:
-                    print("Failed testcases: ")
-                    for e in e2e_failures:
-                        print(e["Test"]["Name"])
-            else:
+                print_e2e_testcase_failures(job["SpyglassLink"],job_type)
+            
+            elif cluster_status == 'SUCCESS' and sep == True:
+                deploy_count += 1
+                e2e_count += 1
+                job_type,_ = job_classifier(job["SpyglassLink"])
+                print_e2e_testcase_failures(job["SpyglassLink"],job_type)
+                print_moinitor_testcase_failures(job["SpyglassLink"],job_type)
+                
+            elif cluster_status == 'FAILURE':
                 print("Cluster Creation Failed")
+            
+            elif cluster_status == 'ERROR':
+                print('Unable to get cluster status please check prowCI UI ')
+            
+            print("\n")
+
+        if len(job_list) != 0:
             print ("\n{}/{} deploys succeeded".format(deploy_count, len(job_list)))
             print ("{}/{} e2e tests succeeded".format(e2e_count, len(job_list)))
-            print("\n")
                 #write function analyze cluster installation failures
+        
+        
         print("--------------------------------------------------------------------------------------------------")
 
 temporary_main_function(config_data)
