@@ -42,7 +42,7 @@ def get_jobs(s):
             match = re.search(pattern, selected_script_element)
             if match:
                 all_jobs=match.group(1)
-                # print(all_builds)
+                #print(all_jobs)
                 try:
                     all_jobs_parsed=json.loads(all_jobs)
                     current_date=get_current_date()
@@ -76,6 +76,26 @@ def cluster_deploy_status(spy_link):
             return 'ERROR'
     else:
         return 'ERROR'
+    
+def get_node_status(spy_link):
+    '''Function to fetch the node status and determine if all nodes are up and running'''
+    _,job_platform = job_classifier(spy_link)
+    if "libvirt" in spy_link and "upgrade" not in spy_link:
+        job_platform = "ocp-e2e-ovn-remote-libvirt-ppc64le/gather-libvirt"
+    elif "powervs" in spy_link:
+        job_platform = "ocp-e2e-ovn-ppc64le-powervs/gather-extra"
+    elif "upgrade" in spy_link:
+        job_platform = "ocp-ovn-remote-libvirt-ppc64le/gather-libvirt"
+    
+    node_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + \
+        "/artifacts/" + job_platform +"/artifacts/oc_cmds/nodes"
+    node_log_response = requests.get(node_log_url, verify=False, timeout=15)
+    response_str=node_log_response.text
+    if response_str.count("libvirt-ppc64le") != 5:
+        return "Not all nodes are up and running"
+    if "NotReady" in response_str:
+        return "Some Nodes are in NotReady state"
+    return "All nodes are in Ready state"
 
 def get_quota_and_nightly(spy_link):
     _,job_platform = job_classifier(spy_link)
@@ -230,7 +250,7 @@ def temporary_main_function(prow_ci_data):
     j=0
     
     for url in prow_ci_data["prow_ci_links"]:
-
+        url = "https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/" + url
         if "4.15" in url:
             sep = True
         else:
@@ -251,6 +271,7 @@ def temporary_main_function(prow_ci_data):
             i=i+1
             print(i,". Job ID: ",job["ID"])
             get_quota_and_nightly(job["SpyglassLink"])
+            print("Node Status:\n ", get_node_status(job["SpyglassLink"]))
 
             if cluster_status == 'SUCCESS' and sep == False:
                 deploy_count += 1
