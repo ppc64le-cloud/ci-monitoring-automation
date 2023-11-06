@@ -19,6 +19,7 @@ def parse_job_date(da):
     job_run_date=parse_date.date()
     return job_run_date
 
+
 def get_jobs(s):
     
     response = requests.get(s, verify=False, timeout=15)
@@ -56,9 +57,11 @@ def get_jobs(s):
                             jobs_run_today.append(job_dict)
                     return jobs_run_today
                 except json.JSONDecodeError as e:
-                    print("convert failed")
+                    print("Failed to extract the spy-links from spylink please check the UI!")
+                    return 'ERROR'
     else:
-        print("response failed")
+        print("Failed to get the prowCI response")
+        return 'ERROR'
     
     #work on removing the unwanted code used to select the script
     #improve code to do better error handling
@@ -177,12 +180,16 @@ def get_failed_monitor_testcases(spy_link,job_type):
                     e2e_failure_list = data['Tests']
                     return e2e_failure_list
                 except json.JSONDecodeError as e:
+                    print("Failed to parse the data from e2e-test log file!")
                     return 'ERROR'
             else:
+                print("Failed to get response from e2e-test log file url!")
                 return 'ERROR'
         else:
+            print("Test summary file not found")
             return 'ERROR'
     else:
+        print("Failed to get response from e2e-test directory url")
         return 'ERROR'
 
 
@@ -206,12 +213,16 @@ def get_failed_e2e_testcases(spy_link,job_type):
                     e2e_failure_list = data['Tests']
                     return e2e_failure_list
                 except json.JSONDecodeError as e:
+                    print("Failed to parse the data from e2e-test log file!")
                     return 'ERROR'
             else:
+                print("Failed to get response from e2e-test log file url!")
                 return 'ERROR'
         else:
+            print("Test summary file not found")
             return 'ERROR'
     else:
+        print("Failed to get response from e2e-test directory url")
         return 'ERROR' 
 
 def print_e2e_testcase_failures(spylink,jobtype):
@@ -245,63 +256,103 @@ def print_monitor_testcase_failures(spylink,jobtype):
     return e2e_result
 
 
-def temporary_main_function(prow_ci_data):
 
-    j=0
+final_job_list=[]
+
+def get_jobs_with_date(prowci_url,start_date,end_date):
     
-    for url in prow_ci_data["prow_ci_links"]:
-        url = "https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/" + url
-        if "4.15" in url:
-            sep = True
-        else:
-            sep = False
+    response = requests.get(prowci_url, verify=False, timeout=15)
 
-        print(prow_ci_data["prow_ci_names"][j])
-        job_list = get_jobs(url)
-        i=0
-        print("-------------------------------------------------------------------------------------------------")
-        if len(job_list) == 0:
-            print ("No job runs on {} today".format(prow_ci_data["prow_ci_names"][j]))
-        j=j+1
-        deploy_count = 0
-        e2e_count = 0
-        for job in job_list:
-            e2e_test_result = e2e_monitor_result = False
-            cluster_status=cluster_deploy_status(job["SpyglassLink"])
-            i=i+1
-            print(i,". Job ID: ",job["ID"])
-            get_quota_and_nightly(job["SpyglassLink"])
-            print("Node Status:\n ", get_node_status(job["SpyglassLink"]))
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-            if cluster_status == 'SUCCESS' and sep == False:
-                deploy_count += 1
-                job_type,_ = job_classifier(job["SpyglassLink"])
-                e2e_test_result = print_e2e_testcase_failures(job["SpyglassLink"],job_type)
-                if e2e_test_result:
-                    e2e_count += 1
+        td_element = soup.find_all('td')
+        td_element2 = str(td_element)
+        next_link_pattern = r'/job[^>"]*'
+        next_link_match = re.search(next_link_pattern,td_element2)
+        next_link = next_link_match.group()
+
+        script_elements = soup.find_all('script')
+        selected_script_element = None
+
+        # print(script_elements) prints the list of scripts elements
+
+        for script_element in script_elements:
+            script_content = script_element.string
+            if script_content:
+                if 'allBuilds' in script_content:
+                    selected_script_element = script_content
+                    break
+        
+        # print(type(selected_script_element)) ##prints script element with a var name
+
+        if selected_script_element:
+            var_name = 'allBuilds'
+            pattern = rf'{var_name}\s*=\s*(.*?);'
+
+            match = re.search(pattern, selected_script_element)
             
-            elif cluster_status == 'SUCCESS' and sep == True:
-                deploy_count += 1
-                job_type,_ = job_classifier(job["SpyglassLink"])
-                e2e_test_result = print_e2e_testcase_failures(job["SpyglassLink"],job_type)
-                e2e_monitor_result = print_monitor_testcase_failures(job["SpyglassLink"],job_type)
-                if e2e_test_result and e2e_monitor_result:
-                    e2e_count += 1
+            if match:
+                all_jobs=match.group(1)
+                try:
+                    all_jobs_parsed=json.loads(all_jobs)
+                    for ele in all_jobs_parsed:
+                        job_time=parse_job_date(ele["Started"])
+                        
+                        if end_date <= job_time <= start_date and ele["Result"] != "PENDING" :
+                            job_log_path = ele["SpyglassLink"]
+                            final_job_list.append(job_log_path)
+
+                    next_page_link = 'https://prow.ci.openshift.org'+next_link
+                    
+                    check=get_next_page_first_build_date(next_page_link,end_date)
+                    
+                    if check == True:
+                        get_jobs_with_date(next_page_link,start_date,end_date)
+                    elif check == 'ERROR':
+                        print("Error")
+                    return final_job_list
+                except json.JSONDecodeError as e:
+                    print("Failed to extract data from the script tag")
+                    return "ERROR"
+    else:
+        print("Failed to get response from the prowCI link")
+        return 'ERROR'
+
+def get_next_page_first_build_date(spylink,end_date):
+
+    response = requests.get(spylink, verify=False, timeout=15)
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.text, 'html.parser')
+        script_elements = soup.find_all('script')
+        selected_script_element = None
+
+        for script_element in script_elements:
+            script_content = script_element.string
+            if script_content:
+                if 'allBuilds' in script_content:
+                    selected_script_element = script_content
+                    break
+        
+        if selected_script_element:
+            var_name = 'allBuilds'
+            pattern = rf'{var_name}\s*=\s*(.*?);'
+
+            match = re.search(pattern, selected_script_element)
+            if match:
+                all_jobs=match.group(1)
                 
-            elif cluster_status == 'FAILURE':
-                print("Cluster Creation Failed")
-            
-            elif cluster_status == 'ERROR':
-                print('Unable to get cluster status please check prowCI UI ')
-
-            print("\n")
-
-        if len(job_list) != 0:
-            print ("\n{}/{} deploys succeeded".format(deploy_count, len(job_list)))
-            print ("{}/{} e2e tests succeeded".format(e2e_count, len(job_list)))
-                #write function analyze cluster installation failures
-        
-        
-        print("--------------------------------------------------------------------------------------------------")
-
-temporary_main_function(config_data)
+                try:
+                    all_jobs_parsed=json.loads(all_jobs)
+                    job_date=all_jobs_parsed[0]["Started"]
+                    parsed_job_date = parse_job_date(job_date)
+                    if end_date <= parsed_job_date:
+                        return True
+                    elif end_date > parsed_job_date:
+                        return False
+                except json.JSONDecodeError as e:
+                    print("Failed to extract the spy-links from spylink please check the UI!")
+                    return "ERROR"
+    else:
+        print("Failed to get the prowCI response")
+        return 'ERROR'
