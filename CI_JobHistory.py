@@ -32,6 +32,7 @@ def check_for_node_crashes(job_list):
             node_status = monitor.get_node_status(url)
             print(job_id,node_status)
 
+
 def temp_main():
     ci = input("Enter prow ci url: ")
     start_date,end_date = get_date_input()

@@ -2,6 +2,7 @@ import json
 from bs4 import BeautifulSoup
 import urllib3
 import monitor
+import subprocess
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -14,17 +15,15 @@ def temporary_main_function(prow_ci_data):
     
     for url in prow_ci_data["prow_ci_links"]:
         url = "https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/" + url
-        if "4.15" in url:
-            sep = True
-        else:
-            sep = False
+
  
         print(prow_ci_data["prow_ci_names"][j])
         job_list = monitor.get_jobs(url)
         i=0
         print("-------------------------------------------------------------------------------------------------")
 
-        if (job_list == 'ERROR'):
+        if isinstance(job_list,str):
+            print(job_list)
             return 1
 
         if len(job_list) == 0:
@@ -39,7 +38,7 @@ def temporary_main_function(prow_ci_data):
             print(i,". Job ID: ",job["ID"])
             monitor.get_quota_and_nightly(job["SpyglassLink"])
 
-            if cluster_status == 'SUCCESS' and sep == False:
+            if cluster_status == 'SUCCESS' and "4.15" not in url:
                 deploy_count += 1
                 job_type,_ = monitor.job_classifier(job["SpyglassLink"])
                 e2e_test_result = monitor.print_e2e_testcase_failures(job["SpyglassLink"],job_type)
@@ -47,7 +46,7 @@ def temporary_main_function(prow_ci_data):
                     e2e_count += 1
                 print("Node Status:\n ", monitor.get_node_status(job["SpyglassLink"]))
             
-            elif cluster_status == 'SUCCESS' and sep == True:
+            elif cluster_status == 'SUCCESS' and "4.15" in url:
                 deploy_count += 1
                 job_type,_ = monitor.job_classifier(job["SpyglassLink"])
                 e2e_test_result = monitor.print_e2e_testcase_failures(job["SpyglassLink"],job_type)

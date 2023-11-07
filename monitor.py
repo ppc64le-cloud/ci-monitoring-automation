@@ -57,14 +57,11 @@ def get_jobs(s):
                             jobs_run_today.append(job_dict)
                     return jobs_run_today
                 except json.JSONDecodeError as e:
-                    print("Failed to extract the spy-links from spylink please check the UI!")
-                    return 'ERROR'
+                    return "Failed to extract the spy-links from spylink please check the UI!"
+                    
     else:
-        print("Failed to get the prowCI response")
-        return 'ERROR'
+        return "Failed to get the prowCI response"
     
-    #work on removing the unwanted code used to select the script
-    #improve code to do better error handling
 
 def cluster_deploy_status(spy_link):
     job_type,job_platform = job_classifier(spy_link)
@@ -180,17 +177,13 @@ def get_failed_monitor_testcases(spy_link,job_type):
                     e2e_failure_list = data['Tests']
                     return e2e_failure_list
                 except json.JSONDecodeError as e:
-                    print("Failed to parse the data from e2e-test log file!")
-                    return 'ERROR'
+                    return "Failed to parse the data from e2e-test log file!"
             else:
-                print("Failed to get response from e2e-test log file url!")
-                return 'ERROR'
+                return "Failed to get response from e2e-test log file url!"
         else:
-            print("Test summary file not found")
-            return 'ERROR'
+            return "Test summary file not found"
     else:
-        print("Failed to get response from e2e-test directory url")
-        return 'ERROR'
+        return "Failed to get response from e2e-test directory url"
 
 
 def get_failed_e2e_testcases(spy_link,job_type):
@@ -213,22 +206,18 @@ def get_failed_e2e_testcases(spy_link,job_type):
                     e2e_failure_list = data['Tests']
                     return e2e_failure_list
                 except json.JSONDecodeError as e:
-                    print("Failed to parse the data from e2e-test log file!")
-                    return 'ERROR'
+                    return "Failed to parse the data from e2e-test log file!"
             else:
-                print("Failed to get response from e2e-test log file url!")
-                return 'ERROR'
+                return "Failed to get response from e2e-test log file url!"
         else:
-            print("Test summary file not found")
-            return 'ERROR'
+            return "Test summary file not found"
     else:
-        print("Failed to get response from e2e-test directory url")
-        return 'ERROR' 
+        return "Failed to get response from e2e-test directory url" 
 
 def print_e2e_testcase_failures(spylink,jobtype):
     e2e_result = False
     e2e_failures = get_failed_e2e_testcases(spylink,jobtype)
-    if e2e_failures != 'ERROR':
+    if isinstance(e2e_failures,list):
         if not e2e_failures:
             print("All e2e conformance test cases passed")
             e2e_result = True
@@ -236,14 +225,14 @@ def print_e2e_testcase_failures(spylink,jobtype):
             print("Failed conformance testcases: ")
             for e in e2e_failures:
                 print(e["Test"]["Name"])
-    else:
-        print("ERROR: Could not find test-failures-summary_*.json…")
+    elif isinstance(e2e_failures,str):
+        print(e2e_failures)
     return e2e_result
 
 def print_monitor_testcase_failures(spylink,jobtype):
     e2e_result = False
     monitor_e2e_failures = get_failed_monitor_testcases(spylink,jobtype)
-    if monitor_e2e_failures != 'ERROR':
+    if isinstance(monitor_e2e_failures,list):
         if not monitor_e2e_failures:
             print("All monitor test cases passed")
             e2e_result = True
@@ -251,13 +240,15 @@ def print_monitor_testcase_failures(spylink,jobtype):
             print("Failed monitor testcases: ")
             for e in monitor_e2e_failures:
                 print(e["Test"]["Name"])
-    else:
-        print("ERROR: Could not find test-failures-summary_monitor_*.json…")
+    elif isinstance(monitor_e2e_failures,str):
+        print(monitor_e2e_failures)
     return e2e_result
 
 
-
 final_job_list=[]
+
+
+#fetches all the job spylinks in the given date range
 
 def get_jobs_with_date(prowci_url,start_date,end_date):
     
@@ -319,6 +310,9 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
         print("Failed to get response from the prowCI link")
         return 'ERROR'
 
+
+#Checks if the jobs next page are in the given date range
+ 
 def get_next_page_first_build_date(spylink,end_date):
 
     response = requests.get(spylink, verify=False, timeout=15)
