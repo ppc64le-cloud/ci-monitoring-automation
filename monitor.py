@@ -91,10 +91,12 @@ def get_node_status(spy_link):
         "/artifacts/" + job_platform +"/artifacts/oc_cmds/nodes"
     node_log_response = requests.get(node_log_url, verify=False, timeout=15)
     response_str=node_log_response.text
-    if response_str.count("libvirt-ppc64le") != 5:
-        return "Not all nodes are up and running"
     if "NotReady" in response_str:
         return "Some Nodes are in NotReady state"
+    elif response_str.count("master-") != 3:
+        return "Not all master nodes are up and running"
+    elif response_str.count("worker-") != 2:
+        return "Not all worker nodes are up and running"
     return "All nodes are in Ready state"
 
 def get_quota_and_nightly(spy_link):
