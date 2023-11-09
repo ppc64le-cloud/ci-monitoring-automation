@@ -102,15 +102,15 @@ def get_node_status(spy_link):
 
 def check_node_crash(spy_link):
     job_type,_ = job_classifier(spy_link)
-    crash_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + job_type + "/ipi-conf-debug-kdump-gather-logs/artifacts/"
+    crash_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" +job_type + "/ipi-conf-debug-kdump-gather-logs/artifacts/"
     crash_log_response = requests.get(crash_log_url, verify=False, timeout=15)
-    if crash_log_response.status_code == 200:
-        if "kdump.tar" in crash_log_response.text:
-            print ("ERROR- Crash observed in the job")
+    if "kdump.tar" in crash_log_response.text:
+        print("*********************************")
+        print ("ERROR- Crash observed in the job")
+        print("*********************************")
     else:
         print("No crash observed")
         
-
 def get_quota_and_nightly(spy_link):
     _,job_platform = job_classifier(spy_link)
 
