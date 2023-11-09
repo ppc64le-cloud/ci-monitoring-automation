@@ -22,5 +22,7 @@
         "periodic-ci-openshift-multiarch-master-nightly-4.15-upgrade-from-nightly-4.14-ocp-ovn-remote-libvirt-ppc64le",
         "periodic-ci-openshift-multiarch-master-nightly-4.15-ocp-e2e-ovn-remote-libvirt-ppc64le",
         "periodic-ci-openshift-multiarch-master-nightly-4.15-ocp-e2e-ovn-ppc64le-powervs"
-    ]
+    ],
+
+    "info_type": "brief"
 }
