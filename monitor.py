@@ -352,3 +352,92 @@ def get_next_page_first_build_date(spylink,end_date):
     else:
         print("Failed to get the prowCI response")
         return 'ERROR'
+
+
+def get_brief_job_info(prow_ci_data):
+    j=0
+
+    for url in prow_ci_data["prow_ci_links"]:
+        url = "https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/" + url
+
+        print(prow_ci_data["prow_ci_names"][j])
+        job_list = get_jobs(url)
+        i=0
+        print("-------------------------------------------------------------------------------------------------")
+
+        #check for get_jobs() function and prints the error message if any
+        if isinstance(job_list,str):
+            print(job_list)
+            return 1
+        
+        if len(job_list) == 0:
+            print ("No job runs on {} today".format(prow_ci_data["prow_ci_names"][j]))
+        
+        j=j+1
+        deploy_count = 0
+        e2e_count = 0
+
+        for job in job_list:
+            e2e_test_result = e2e_monitor_result = False
+            cluster_status=cluster_deploy_status(job["SpyglassLink"])
+            i=i+1
+            print(i,".Job ID: ",job["ID"])
+            joblink = 'https://prow.ci.openshift.org'+url
+            print(" Job link: ",joblink)
+            get_quota_and_nightly(job["SpyglassLink"])
+
+            if cluster_status == 'SUCCESS' and "4.15" not in url:
+                deploy_count += 1
+                job_type,_ = job_classifier(job["SpyglassLink"])
+                e2e_test_result = get_failed_e2e_testcases(job["SpyglassLink"],job_type)
+                if isinstance(e2e_test_result,list):
+                    if len(e2e_test_result) == 0:
+                        e2e_count += 1
+                        print("All e2e testcases passed")
+                    elif len(e2e_test_result) != 0:
+                        print(len(e2e_test_result),"testcases failed")
+                elif isinstance(e2e_test_result,str):
+                    print(e2e_test_result)
+
+            elif cluster_status == 'SUCCESS' and "4.15" in url:
+                deploy_count += 1
+                job_type,_ = job_classifier(job["SpyglassLink"])
+                e2e_test_result = get_failed_e2e_testcases(job["SpyglassLink"],job_type)
+                e2e_monitor_result = get_failed_monitor_testcases(job["SpyglassLink"],job_type)
+                if isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,list):
+                    
+                    total_e2e_failure = len(e2e_test_result)+len(e2e_monitor_result)
+                    if total_e2e_failure != 0:
+                        print(len(total_e2e_failure),"testcases failed")
+                    elif total_e2e_failure == 0:
+                        e2e_count += 1
+                        print("All e2e testcases passed")
+                elif isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,str):
+                    print(e2e_monitor_result) #prints the error message recived while fetching monitor testcase results
+                    if len(e2e_test_result) !=0:
+                        print(len(e2e_test_result), "conformance testcases failed")
+                    elif len(e2e_test_result) == 0:
+                        print("All conformance e2e testcases passed")
+                elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,list):
+                    print(e2e_test_result) #prints the error message recived while fetching conformance testcase results
+                    if len(e2e_monitor_result) !=0:
+                        print(len(e2e_monitor_result), "monitor testcases failed")
+                    elif len(e2e_monitor_result) == 0:
+                        print("All monitor e2e testcases passed")
+                elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,str):
+                    print(e2e_test_result)
+                    print(e2e_monitor_result)
+        
+            elif cluster_status == 'FAILURE':
+                print("Cluster Creation Failed")
+
+            elif cluster_status == 'ERROR':
+                print('Unable to get cluster status please check prowCI UI ')
+
+            print("\n")
+
+        if len(job_list) != 0:
+            print ("\n{}/{} deploys succeeded".format(deploy_count, len(job_list)))
+            print ("{}/{} e2e tests succeeded".format(e2e_count, len(job_list)))
+
+        print("--------------------------------------------------------------------------------------------------")
