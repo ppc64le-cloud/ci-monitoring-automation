@@ -99,6 +99,23 @@ def get_node_status(spy_link):
         return "Not all worker nodes are up and running"
     return "All nodes are in Ready state"
 
+def check_node_crash(spy_link):
+    _,job_platform = job_classifier(spy_link)
+    if "libvirt" in spy_link and "upgrade" not in spy_link:
+        job_platform = "ocp-e2e-ovn-remote-libvirt-ppc64le"
+    elif "powervs" in spy_link:
+        job_platform = "ocp-e2e-ovn-ppc64le-powervs"
+    elif "upgrade" in spy_link:
+        job_platform = "ocp-ovn-remote-libvirt-ppc64le"
+    crash_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + job_platform + "/ipi-conf-debug-kdump-gather-logs/artifacts/"
+    crash_log_response = requests.get(crash_log_url, verify=False, timeout=15)
+    if crash_log_response.status_code == 200:
+        if "kdump.tar" in crash_log_response.text:
+            print ("ERROR- Crash observed in the job")
+    else:
+        print("No crash observed")
+        
+
 def get_quota_and_nightly(spy_link):
     _,job_platform = job_classifier(spy_link)
 
@@ -385,6 +402,7 @@ def get_brief_job_info(prow_ci_data):
             joblink = 'https://prow.ci.openshift.org'+url
             print(" Job link: ",joblink)
             get_quota_and_nightly(job["SpyglassLink"])
+            check_node_crash(job["SpyglassLink"])
 
             if cluster_status == 'SUCCESS' and "4.15" not in url:
                 deploy_count += 1
