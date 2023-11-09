@@ -24,5 +24,5 @@
         "periodic-ci-openshift-multiarch-master-nightly-4.15-ocp-e2e-ovn-ppc64le-powervs"
     ],
 
-    "info_type": "brief"
+    "info_type": "True"
 }

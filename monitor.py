@@ -391,8 +391,8 @@ def get_brief_job_info(prow_ci_data):
                 job_type,_ = job_classifier(job["SpyglassLink"])
                 e2e_test_result = get_failed_e2e_testcases(job["SpyglassLink"],job_type)
                 if isinstance(e2e_test_result,list):
-                    e2e_count += 1
                     if len(e2e_test_result) == 0:
+                        e2e_count += 1
                         print("All e2e testcases passed")
                     elif len(e2e_test_result) != 0:
                         print(len(e2e_test_result),"testcases failed")
@@ -402,20 +402,28 @@ def get_brief_job_info(prow_ci_data):
             elif cluster_status == 'SUCCESS' and "4.15" in url:
                 deploy_count += 1
                 job_type,_ = job_classifier(job["SpyglassLink"])
-                e2e_test_result = print_e2e_testcase_failures(job["SpyglassLink"],job_type)
-                e2e_monitor_result = print_monitor_testcase_failures(job["SpyglassLink"],job_type)
+                e2e_test_result = get_failed_e2e_testcases(job["SpyglassLink"],job_type)
+                e2e_monitor_result = get_failed_monitor_testcases(job["SpyglassLink"],job_type)
                 if isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,list):
-                    e2e_count += 1
+                    
                     total_e2e_failure = len(e2e_test_result)+len(e2e_monitor_result)
-                    print(len(total_e2e_failure),"testcases failed")
+                    if total_e2e_failure != 0:
+                        print(len(total_e2e_failure),"testcases failed")
+                    elif total_e2e_failure == 0:
+                        e2e_count += 1
+                        print("All e2e testcases passed")
                 elif isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,str):
-                    e2e_count += 1
-                    print(e2e_monitor_result)
-                    print(len(e2e_test_result), "conformance testcases failed")
+                    print(e2e_monitor_result) #prints the error message recived while fetching monitor testcase results
+                    if len(e2e_test_result) !=0:
+                        print(len(e2e_test_result), "conformance testcases failed")
+                    elif len(e2e_test_result) == 0:
+                        print("All conformance e2e testcases passed")
                 elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,list):
-                    e2e_count += 1
-                    print(e2e_test_result)
-                    print(len(e2e_monitor_result), "monitor testcases failed")
+                    print(e2e_test_result) #prints the error message recived while fetching conformance testcase results
+                    if len(e2e_monitor_result) !=0:
+                        print(len(e2e_monitor_result), "monitor testcases failed")
+                    elif len(e2e_monitor_result) == 0:
+                        print("All monitor e2e testcases passed")
                 elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,str):
                     print(e2e_test_result)
                     print(e2e_monitor_result)
