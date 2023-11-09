@@ -79,35 +79,30 @@ def cluster_deploy_status(spy_link):
     
 def get_node_status(spy_link):
     '''Function to fetch the node status and determine if all nodes are up and running'''
-    _,job_platform = job_classifier(spy_link)
-    if "libvirt" in spy_link and "upgrade" not in spy_link:
-        job_platform = "ocp-e2e-ovn-remote-libvirt-ppc64le/gather-libvirt"
-    elif "powervs" in spy_link:
-        job_platform = "ocp-e2e-ovn-ppc64le-powervs/gather-extra"
-    elif "upgrade" in spy_link:
-        job_platform = "ocp-ovn-remote-libvirt-ppc64le/gather-libvirt"
+    job_type,job_platform = job_classifier(spy_link)
+    if job_platform == "powervs":
+        job_type += "/gather-extra"
+    else:
+        job_type += "/gather-libvirt"
     
     node_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + \
-        "/artifacts/" + job_platform +"/artifacts/oc_cmds/nodes"
+        "/artifacts/" + job_type +"/artifacts/oc_cmds/nodes"
     node_log_response = requests.get(node_log_url, verify=False, timeout=15)
-    response_str=node_log_response.text
-    if "NotReady" in response_str:
-        return "Some Nodes are in NotReady state"
-    elif response_str.count("master-") != 3:
-        return "Not all master nodes are up and running"
-    elif response_str.count("worker-") != 2:
-        return "Not all worker nodes are up and running"
+    if "NAME" in node_log_response.text:
+        response_str=node_log_response.text
+        if "NotReady" in response_str:
+            return "Some Nodes are in NotReady state"
+        elif response_str.count("master-") != 3:
+            return "Not all master nodes are up and running"
+        elif response_str.count("worker-") != 2:
+            return "Not all worker nodes are up and running"
+    else:
+        return "Node details not found"
     return "All nodes are in Ready state"
 
 def check_node_crash(spy_link):
-    _,job_platform = job_classifier(spy_link)
-    if "libvirt" in spy_link and "upgrade" not in spy_link:
-        job_platform = "ocp-e2e-ovn-remote-libvirt-ppc64le"
-    elif "powervs" in spy_link:
-        job_platform = "ocp-e2e-ovn-ppc64le-powervs"
-    elif "upgrade" in spy_link:
-        job_platform = "ocp-ovn-remote-libvirt-ppc64le"
-    crash_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + job_platform + "/ipi-conf-debug-kdump-gather-logs/artifacts/"
+    job_type,_ = job_classifier(spy_link)
+    crash_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + job_type + "/ipi-conf-debug-kdump-gather-logs/artifacts/"
     crash_log_response = requests.get(crash_log_url, verify=False, timeout=15)
     if crash_log_response.status_code == 200:
         if "kdump.tar" in crash_log_response.text:
@@ -399,10 +394,11 @@ def get_brief_job_info(prow_ci_data):
             cluster_status=cluster_deploy_status(job["SpyglassLink"])
             i=i+1
             print(i,".Job ID: ",job["ID"])
-            joblink = 'https://prow.ci.openshift.org'+url
-            print(" Job link: ",joblink)
+            print(" Job link: ",url.replace("job-history", "view")+"/"+job["ID"])
             get_quota_and_nightly(job["SpyglassLink"])
             check_node_crash(job["SpyglassLink"])
+            node_status = get_node_status(job["SpyglassLink"])
+            print(node_status)
 
             if cluster_status == 'SUCCESS' and "4.15" not in url:
                 deploy_count += 1
