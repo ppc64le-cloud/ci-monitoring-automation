@@ -31,6 +31,7 @@ def check_for_node_crashes(job_list):
         if cluster_deploy_status == 'SUCCESS':
             node_status = monitor.get_node_status(url)
             print(job_id,node_status)
+        monitor.check_node_crash(url)
 
 
 def temp_main():
