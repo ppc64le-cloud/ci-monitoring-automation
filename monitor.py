@@ -22,7 +22,9 @@ def parse_job_date(da):
 
 def get_jobs(s):
     
-    response = requests.get(s, verify=False, timeout=15)
+    url = "https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/" + s
+
+    response = requests.get(url, verify=False, timeout=15)
     
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -51,10 +53,8 @@ def get_jobs(s):
                     for ele in all_jobs_parsed:
                         job_time=parse_job_date(ele["Started"])
                         if job_time == current_date and ele["Result"] != "PENDING":
-                            job_id = ele["ID"]
                             job_log_path = ele["SpyglassLink"]
-                            job_dict = {"ID": job_id, "SpyglassLink": job_log_path}
-                            jobs_run_today.append(job_dict)
+                            jobs_run_today.append(job_log_path)
                     return jobs_run_today
                 except json.JSONDecodeError as e:
                     return "Failed to extract the spy-links from spylink please check the UI!"
@@ -265,8 +265,12 @@ final_job_list=[]
 #fetches all the job spylinks in the given date range
 
 def get_jobs_with_date(prowci_url,start_date,end_date):
+
+    url = "https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/" + prowci_url
+
     
-    response = requests.get(prowci_url, verify=False, timeout=15)
+    response = requests.get(url, verify=False, timeout=15)
+
 
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -366,92 +370,95 @@ def get_next_page_first_build_date(spylink,end_date):
         return 'ERROR'
 
 
-def get_brief_job_info(prow_ci_data):
-    j=0
+def get_brief_job_info(prow_ci_link,prow_ci_name,start_date=None,end_date=None):
 
-    for url in prow_ci_data["prow_ci_links"]:
-        url = "https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/" + url
+    if start_date is not None and end_date is not None:
+        job_list = get_jobs_with_date(prow_ci_link,start_date,end_date)
+    else:
+        job_list = get_jobs(prow_ci_link)
 
-        print(prow_ci_data["prow_ci_names"][j])
-        job_list = get_jobs(url)
-        i=0
-        print("-------------------------------------------------------------------------------------------------")
+    print("-------------------------------------------------------------------------------------------------")
 
-        #check for get_jobs() function and prints the error message if any
-        if isinstance(job_list,str):
-            print(job_list)
-            return 1
+    print(prow_ci_name)
+
+    if isinstance(job_list,str):
+        print(job_list)
+        return 1
         
-        if len(job_list) == 0:
-            print ("No job runs on {} today".format(prow_ci_data["prow_ci_names"][j]))
-        
-        j=j+1
-        deploy_count = 0
-        e2e_count = 0
+    if len(job_list) == 0:
+        print ("No job runs on {} today".format(prow_ci_name))
 
-        for job in job_list:
-            e2e_test_result = e2e_monitor_result = False
-            cluster_status=cluster_deploy_status(job["SpyglassLink"])
-            i=i+1
-            print(i,".Job ID: ",job["ID"])
-            print(" Job link: ",url.replace("job-history", "view")+"/"+job["ID"])
-            get_quota_and_nightly(job["SpyglassLink"])
-            check_node_crash(job["SpyglassLink"])
-            node_status = get_node_status(job["SpyglassLink"])
-            print(node_status)
+    deploy_count = 0
+    e2e_count = 0
+    i=0
 
-            if cluster_status == 'SUCCESS' and "4.15" not in url:
-                deploy_count += 1
-                job_type,_ = job_classifier(job["SpyglassLink"])
-                e2e_test_result = get_failed_e2e_testcases(job["SpyglassLink"],job_type)
-                if isinstance(e2e_test_result,list):
-                    if len(e2e_test_result) == 0:
-                        e2e_count += 1
-                        print("All e2e testcases passed")
-                    elif len(e2e_test_result) != 0:
-                        print(len(e2e_test_result),"testcases failed")
-                elif isinstance(e2e_test_result,str):
-                    print(e2e_test_result)
+    pattern_job_id =  r'/(\d+)'
 
-            elif cluster_status == 'SUCCESS' and "4.15" in url:
-                deploy_count += 1
-                job_type,_ = job_classifier(job["SpyglassLink"])
-                e2e_test_result = get_failed_e2e_testcases(job["SpyglassLink"],job_type)
-                e2e_monitor_result = get_failed_monitor_testcases(job["SpyglassLink"],job_type)
-                if isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,list):
-                    
-                    total_e2e_failure = len(e2e_test_result)+len(e2e_monitor_result)
-                    if total_e2e_failure != 0:
-                        print(len(total_e2e_failure),"testcases failed")
-                    elif total_e2e_failure == 0:
-                        e2e_count += 1
-                        print("All e2e testcases passed")
-                elif isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,str):
-                    print(e2e_monitor_result) #prints the error message recived while fetching monitor testcase results
-                    if len(e2e_test_result) !=0:
-                        print(len(e2e_test_result), "conformance testcases failed")
-                    elif len(e2e_test_result) == 0:
-                        print("All conformance e2e testcases passed")
-                elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,list):
-                    print(e2e_test_result) #prints the error message recived while fetching conformance testcase results
-                    if len(e2e_monitor_result) !=0:
-                        print(len(e2e_monitor_result), "monitor testcases failed")
-                    elif len(e2e_monitor_result) == 0:
-                        print("All monitor e2e testcases passed")
-                elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,str):
-                    print(e2e_test_result)
-                    print(e2e_monitor_result)
-        
-            elif cluster_status == 'FAILURE':
+    for job in job_list:
+        match = re.search(pattern_job_id, job)
+        job_id = match.group(1)
+        e2e_test_result = e2e_monitor_result = False
+        cluster_status=cluster_deploy_status(job)
+        i=i+1
+        print(i,".","Job ID: ",job_id)
+        # print(" Job link: ",url.replace("job-history", "view")+"/"+job_id)
+        get_quota_and_nightly(job)
+        check_node_crash(job)
+        node_status = get_node_status(job)
+        print(node_status)
+
+        if cluster_status == 'SUCCESS' and "4.15" not in prow_ci_link:
+            deploy_count += 1
+            job_type,_ = job_classifier(job)
+            e2e_test_result = get_failed_e2e_testcases(job,job_type)
+            if isinstance(e2e_test_result,list):
+                if len(e2e_test_result) == 0:
+                    e2e_count += 1
+                    print("All e2e testcases passed")
+                elif len(e2e_test_result) != 0:
+                    print(len(e2e_test_result),"testcases failed")
+            elif isinstance(e2e_test_result,str):
+                print(e2e_test_result)
+
+        elif cluster_status == 'SUCCESS' and "4.15" in prow_ci_link:
+            deploy_count += 1
+            job_type,_ = job_classifier(job)
+            e2e_test_result = get_failed_e2e_testcases(job,job_type)
+            e2e_monitor_result = get_failed_monitor_testcases(job,job_type)
+            if isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,list):        
+                total_e2e_failure = len(e2e_test_result)+len(e2e_monitor_result)
+                if total_e2e_failure != 0:
+                    print(total_e2e_failure,"testcases failed")
+                elif total_e2e_failure == 0:
+                    e2e_count += 1
+                    print("All e2e testcases passed")
+            elif isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,str):
+                print(e2e_monitor_result) #prints the error message recived while fetching monitor testcase results
+                if len(e2e_test_result) !=0:
+                    print(len(e2e_test_result), "conformance testcases failed")
+                elif len(e2e_test_result) == 0:
+                    print("All conformance e2e testcases passed")
+            elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,list):
+                print(e2e_test_result) #prints the error message recived while fetching conformance testcase results
+                if len(e2e_monitor_result) !=0:
+                    print(len(e2e_monitor_result), "monitor testcases failed")
+                elif len(e2e_monitor_result) == 0:
+                    print("All monitor e2e testcases passed")
+            elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,str):
+                print(e2e_test_result)
+                print(e2e_monitor_result)
+
+        elif cluster_status == 'FAILURE':
                 print("Cluster Creation Failed")
 
-            elif cluster_status == 'ERROR':
-                print('Unable to get cluster status please check prowCI UI ')
+        elif cluster_status == 'ERROR':
+            print('Unable to get cluster status please check prowCI UI ')
 
-            print("\n")
-
-        if len(job_list) != 0:
-            print ("\n{}/{} deploys succeeded".format(deploy_count, len(job_list)))
-            print ("{}/{} e2e tests succeeded".format(e2e_count, len(job_list)))
+        print("\n")
+        
+    if len(job_list) != 0:
+        print ("\n{}/{} deploys succeeded".format(deploy_count, len(job_list)))
+        print ("{}/{} e2e tests succeeded".format(e2e_count, len(job_list)))
+        
 
         print("--------------------------------------------------------------------------------------------------")
