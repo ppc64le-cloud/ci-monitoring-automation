@@ -126,7 +126,7 @@ def get_quota_and_nightly(spy_link):
     if zone_log_match is None:
         print("Failed to fetch lease information")
     else:
-        print("Lease Quota-",zone_log_match.group(2))
+        print("Lease Quota:",zone_log_match.group(2))
     # Fetch the nightly information for non-upgrade jobs
     if "upgrade" not in build_log_url:
         nightly_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
@@ -319,7 +319,7 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
                     if check == True:
                         get_jobs_with_date(next_page_link,start_date,end_date)
                     elif check == 'ERROR':
-                        print("Error")
+                        print("Error while fetching the job-links please check the UI")
                     return final_job_list
                 except json.JSONDecodeError as e:
                     print("Failed to extract data from the script tag")
@@ -370,7 +370,7 @@ def get_next_page_first_build_date(spylink,end_date):
         return 'ERROR'
 
 
-def get_brief_job_info(prow_ci_link,prow_ci_name,start_date=None,end_date=None):
+def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
 
     if start_date is not None and end_date is not None:
         job_list = get_jobs_with_date(prow_ci_link,start_date,end_date)
@@ -386,7 +386,7 @@ def get_brief_job_info(prow_ci_link,prow_ci_name,start_date=None,end_date=None):
         return 1
         
     if len(job_list) == 0:
-        print ("No job runs on {} today".format(prow_ci_name))
+        print ("No job runs on {} ".format(prow_ci_name))
 
     deploy_count = 0
     e2e_count = 0
@@ -401,7 +401,7 @@ def get_brief_job_info(prow_ci_link,prow_ci_name,start_date=None,end_date=None):
         cluster_status=cluster_deploy_status(job)
         i=i+1
         print(i,".","Job ID: ",job_id)
-        # print(" Job link: ",url.replace("job-history", "view")+"/"+job_id)
+        print("Job link: https://prow.ci.openshift.org/"+job)
         get_quota_and_nightly(job)
         check_node_crash(job)
         node_status = get_node_status(job)

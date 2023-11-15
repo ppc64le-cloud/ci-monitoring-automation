@@ -12,8 +12,8 @@ with open('config.json') as config_file:
 
 
 def get_date_input():
-    date_str_1 = input("Enter start date (YYYY-MM-DD): ") #example  2023-11-14
-    date_str_2 = input("Enter end date (YYYY-MM-DD): ")  #example  2023-11-13
+    date_str_1 = input("Enter Before(From) date (YYYY-MM-DD): ") #example  2023-11-14
+    date_str_2 = input("Enter After(to) date (YYYY-MM-DD): ")  #example  2023-11-13
     try:
         start_date = datetime.strptime(date_str_1,"%Y-%m-%d")
         end_date = datetime.strptime(date_str_2,"%Y-%m-%d")
@@ -40,58 +40,59 @@ def check_for_node_crashes(job_list):
 def display_ci_links(config_data):
     j=0
 
-    for ci_name in config_data["prow_ci_names"]:
+    ci_name_list = []
+
+    for ci_name in config_data.keys():
         j=j+1
+        ci_name_list.append(ci_name)
         print(j,'',ci_name)
 
     option = input("Select the required ci's serial number with a space ")
     selected_options = option.split()
     options_int_list = []
     selected_config_data = {}
-    selected_ci_names = []
-    selected_ci_links = []
+   
     for ci in selected_options:
         try:
             ci_to_int = int(ci)
-            if 0 < ci_to_int <= len(config_data["prow_ci_links"]):
+            if 0 < ci_to_int <= len(config_data):
                 options_int_list.append(ci_to_int)
             else:
-                return "Enter the options in range of 1 to 10"
+                return_value = "Enter the options in range of 1 to " + str(len(config_data))
+                print(return_value)
+                return "ERROR"
         except ValueError:
             return "Enter valid options"
 
     for i in options_int_list:
-        selected_ci_names.append(config_data["prow_ci_names"][i-1])
-        selected_ci_links.append(config_data["prow_ci_links"][i-1])
-        selected_config_data={"prow_ci_names": selected_ci_names, "prow_ci_links":selected_ci_links}
+        config_temp_data = {ci_name_list[i-1]: config_data[ci_name_list[i-1]]}
+        selected_config_data.update(config_temp_data)
+        config_temp_data = {}
     
-    print(selected_config_data)
     return selected_config_data
 
 
 def temp_main(config_data):
     ci_list = display_ci_links(config_data)
-    start_date,end_date = get_date_input()
 
-    print(ci_list)
-    print("Please select one of the option from Job History functionalities: ")
-    print("1. Node Status")
-    print("2. Brief Job information")
-    option = input("Enter the option: ")
+
+    if isinstance(ci_list,dict):
+        start_date,end_date = get_date_input()
+        print("Please select one of the option from Job History functionalities: ")
+        print("1. Node Status")
+        print("2. Brief Job information")
+        option = input("Enter the option: ")
     
-    if option == '1':
-        j=0
-        for ci in ci_list["prow_ci_links"]:
-            print("-------------------------------------------------------------------------------------------------")
-            print(ci_list["prow_ci_names"][j])
-            spy_links = monitor.get_jobs_with_date(ci,start_date,end_date)
-            check_for_node_crashes(spy_links)
-            j=j+1
-    if option == '2':
-        j=0
-        for i in ci_list["prow_ci_links"]:
-            monitor.get_brief_job_info(ci_list["prow_ci_links"][j],ci_list["prow_ci_names"][j],start_date,end_date)
-            monitor.final_job_list = []
-            j=j+1
+        if option == '1':
+            for ci_name,ci_link in ci_list.items():
+                print("-------------------------------------------------------------------------------------------------")
+                print(ci_name)
+                spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
+                check_for_node_crashes(spy_links)
+            
+        if option == '2':
+            for ci_name,ci_link in ci_list.items():
+                monitor.get_brief_job_info(ci_name,ci_link,start_date,end_date)
+                monitor.final_job_list = []
 
 temp_main(config_data)

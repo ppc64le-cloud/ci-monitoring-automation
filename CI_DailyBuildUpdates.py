@@ -16,12 +16,8 @@ def new_main(config_data):
     parser.add_argument('--info_type', default='brief', help='specify the job info type')
     args = parser.parse_args()
     if args.info_type == "brief":
-        j=0
-        for i in config_data["prow_ci_links"]:
-            # print(config_data["prow_ci_links"][j],config_data["prow_ci_names"][j])
-            monitor.get_brief_job_info(config_data["prow_ci_links"][j],config_data["prow_ci_names"][j])
-            j=j+1
-            # monitor.get_brief_job_info(config_data["prow_ci_links"][i],config_data["prow_ci_names"][i])
+        for ci_name,ci_link in config_data.items():
+            monitor.get_brief_job_info(ci_name,ci_link)
     elif args.info_type == "detailed":
         print("Need to develop functions to get detailed information")
 
