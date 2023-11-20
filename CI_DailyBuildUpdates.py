@@ -16,7 +16,8 @@ def new_main(config_data):
     parser.add_argument('--info_type', default='brief', help='specify the job info type')
     args = parser.parse_args()
     if args.info_type == "brief":
-        monitor.get_brief_job_info(config_data)
+        for ci_name,ci_link in config_data.items():
+            monitor.get_brief_job_info(ci_name,ci_link)
     elif args.info_type == "detailed":
         print("Need to develop functions to get detailed information")
 
