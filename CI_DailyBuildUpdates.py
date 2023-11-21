@@ -18,6 +18,7 @@ def new_main(config_data):
         for ci_name,ci_link in config_data.items():
             monitor.get_brief_job_info(ci_name,ci_link)
     elif args.info_type == "detailed":
-        print("Need to develop functions to get detailed information")
+        for ci_name,ci_link in config_data.items():
+            monitor.get_detailed_job_info(ci_name,ci_link)
 
 new_main(config_data)
