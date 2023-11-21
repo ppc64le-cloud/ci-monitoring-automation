@@ -9,6 +9,6 @@
     "4.14 powervs": "periodic-ci-openshift-multiarch-master-nightly-4.14-ocp-e2e-ovn-ppc64le-powervs",
     "4.14 to 4.15 upgrade": "periodic-ci-openshift-multiarch-master-nightly-4.15-upgrade-from-nightly-4.14-ocp-ovn-remote-libvirt-ppc64le",
     "4.15 libvirt": "periodic-ci-openshift-multiarch-master-nightly-4.15-ocp-e2e-ovn-remote-libvirt-ppc64le",
-    "4.15 powervs": "periodic-ci-openshift-multiarch-master-nightly-4.15-ocp-e2e-ovn-ppc64le-powervs"
+    "4.15 powervs": "periodic-ci-openshift-multiarch-master-nightly-4.15-ocp-e2e-ovn-ppc64le-powervs-per"
 
 }

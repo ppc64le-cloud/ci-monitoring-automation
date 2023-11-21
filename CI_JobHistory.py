@@ -78,21 +78,22 @@ def temp_main(config_data):
 
     if isinstance(ci_list,dict):
         start_date,end_date = get_date_input()
-        print("Please select one of the option from Job History functionalities: ")
-        print("1. Node Status")
-        print("2. Brief Job information")
-        option = input("Enter the option: ")
+        if start_date != None and end_date != None:
+            print("Please select one of the option from Job History functionalities: ")
+            print("1. Node Status")
+            print("2. Brief Job information")
+            option = input("Enter the option: ")
     
-        if option == '1':
-            for ci_name,ci_link in ci_list.items():
-                print("-------------------------------------------------------------------------------------------------")
-                print(ci_name)
-                spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
-                check_for_node_crashes(spy_links)
+            if option == '1':
+                for ci_name,ci_link in ci_list.items():
+                    print("-------------------------------------------------------------------------------------------------")
+                    print(ci_name)
+                    spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
+                    check_for_node_crashes(spy_links)
             
-        if option == '2':
-            for ci_name,ci_link in ci_list.items():
-                monitor.get_brief_job_info(ci_name,ci_link,start_date,end_date)
-                monitor.final_job_list = []
+            if option == '2':
+                for ci_name,ci_link in ci_list.items():
+                    monitor.get_brief_job_info(ci_name,ci_link,start_date,end_date)
+                    monitor.final_job_list = []
 
 temp_main(config_data)

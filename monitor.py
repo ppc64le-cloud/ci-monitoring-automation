@@ -77,6 +77,44 @@ def cluster_deploy_status(spy_link):
     else:
         return 'ERROR'
     
+def cluster_creation_error_analysis(spylink):
+    job_type,job_platform = job_classifier(spylink)
+    job_log_url = 'https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs' + spylink[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/build-log.txt'
+    
+    response = requests.get(job_log_url,verify=False)
+
+    if response.status_code == 200:
+
+        installation_log = response.text
+        if job_platform == "powervs":
+            failed_line_index = installation_log.find("FAILED")
+            cluster_failure_log = installation_log[failed_line_index:].splitlines()
+            for line in cluster_failure_log[1:7]:
+                print(line)
+                    
+        elif job_platform == "libvirt":
+            failed_line_index_1 = installation_log.find("level-error")
+            
+            if failed_line_index_1 == -1:
+                failed_line_index_2 = installation_log.find("level=fatal")
+                if failed_line_index_2 == -1:
+                    failed_line_number_3 = installation_log.find("error:")
+                    cluster_failure_log = installation_log[failed_line_number_3:].splitlines()
+
+                    for line in cluster_failure_log[:7]:
+                        print(line)
+                else:
+                    cluster_failure_log = installation_log[failed_line_index_2:].splitlines()
+
+                    for line in cluster_failure_log[:7]:
+                        print(line)
+            else:
+                cluster_failure_log = installation_log[failed_line_index_1:].splitlines()
+                for line in cluster_failure_log[1:7]:
+                    print(line)
+    else:
+        print("Error while fetching cluster installation logs")
+
 def get_node_status(spy_link):
     '''Function to fetch the node status and determine if all nodes are up and running'''
     job_type,job_platform = job_classifier(spy_link)
@@ -331,9 +369,9 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
 
 #Checks if the jobs next page are in the given date range
  
-def get_next_page_first_build_date(spylink,end_date):
+def get_next_page_first_build_date(ci_next_page_link,end_date):
 
-    response = requests.get(spylink, verify=False, timeout=15)
+    response = requests.get(ci_next_page_link, verify=False, timeout=15)
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, 'html.parser')
         script_elements = soup.find_all('script')
@@ -450,6 +488,7 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
 
         elif cluster_status == 'FAILURE':
                 print("Cluster Creation Failed")
+                cluster_creation_error_analysis(job)
 
         elif cluster_status == 'ERROR':
             print('Unable to get cluster status please check prowCI UI ')

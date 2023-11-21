@@ -2,7 +2,6 @@ import json
 from bs4 import BeautifulSoup
 import urllib3
 import monitor
-import subprocess
 import argparse
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
