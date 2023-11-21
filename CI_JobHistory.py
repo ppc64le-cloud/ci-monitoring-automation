@@ -82,6 +82,7 @@ def temp_main(config_data):
             print("Please select one of the option from Job History functionalities: ")
             print("1. Node Status")
             print("2. Brief Job information")
+            print("3. Detailed Job information")
             option = input("Enter the option: ")
     
             if option == '1':
@@ -94,6 +95,11 @@ def temp_main(config_data):
             if option == '2':
                 for ci_name,ci_link in ci_list.items():
                     monitor.get_brief_job_info(ci_name,ci_link,start_date,end_date)
+                    monitor.final_job_list = []
+            
+            if option == '3':
+                for ci_name,ci_link in ci_list.items():
+                    monitor.get_detailed_job_info(ci_name,ci_link,start_date,end_date)
                     monitor.final_job_list = []
 
 temp_main(config_data)
