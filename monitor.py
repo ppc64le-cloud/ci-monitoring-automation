@@ -162,9 +162,9 @@ def get_quota_and_nightly(spy_link):
     build_log_response = requests.get(build_log_url, verify=False, timeout=15)
     zone_log_match = zone_log_re.search(build_log_response.text)
     if zone_log_match is None:
-        print("Failed to fetch lease information")
+        lease = "Failed to fetch lease information"
     else:
-        print("Lease Quota:",zone_log_match.group(2))
+        lease = zone_log_match.group(2)
     # Fetch the nightly information for non-upgrade jobs
     if "upgrade" not in build_log_url:
         nightly_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
@@ -173,25 +173,26 @@ def get_quota_and_nightly(spy_link):
             rc_nightly_log_re = re.compile('(Using explicitly provided pull-spec for release ppc64le-latest \((\S+)\))', re.MULTILINE|re.DOTALL)
             rc_nightly_log_match = rc_nightly_log_re.search(build_log_response.text)
             if rc_nightly_log_match is None:
-                print ("Unable to fetch nightly information- No match found")
+                nightly = "Unable to fetch nightly information- No match found"
             else:
-                print(rc_nightly_log_match.group(2))
+                nightly = rc_nightly_log_match.group(2)
         else:
-            print("ppc64le-latest-",nightly_log_match.group(2))
+            nightly = "ppc64le-latest-"+ nightly_log_match.group(2)
     # Fetch nightly information for upgrade jobs- fetch both ppc64le-initial and ppc64le-latest
     else:
         nightly_initial_log_re = re.compile('(Resolved release ppc64le-initial to (\S+))', re.MULTILINE|re.DOTALL)
         nightly_initial_log_match = nightly_initial_log_re.search(build_log_response.text)
         if nightly_initial_log_match is None:
-            print ("Unable to fetch nightly ppc64le-initial information- No match found")
+            nightly = "Unable to fetch nightly ppc64le-initial information- No match found"
         else:
-            print("ppc64le-initial-",nightly_initial_log_match.group(2))
+            nightly = "ppc64le-initial-"+ nightly_initial_log_match.group(2)
         nightly_latest_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
         nightly_latest_log_match = nightly_latest_log_re.search(build_log_response.text)
         if nightly_latest_log_match is None:
-            print ("Unable to fetch nightly ppc64le-latest information- No match found")
+            nightly = nightly + " Unable to fetch nightly ppc64le-latest information- No match found"
         else:
-            print("ppc64le-latest-",nightly_latest_log_match.group(2))
+            nightly = nightly + " ppc64le-latest-"+ nightly_latest_log_match.group(2)
+    return lease, nightly
 
 def job_classifier(spy_link):
 
@@ -407,7 +408,6 @@ def get_next_page_first_build_date(ci_next_page_link,end_date):
         print("Failed to get the prowCI response")
         return 'ERROR'
 
-
 def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
 
     if start_date is not None and end_date is not None:
@@ -415,14 +415,10 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
     else:
         job_list = get_jobs(prow_ci_link)
 
-    print("-------------------------------------------------------------------------------------------------")
-
-    print(prow_ci_name)
-
     if isinstance(job_list,str):
         print(job_list)
         return 1
-        
+    summary_list = []   
     if len(job_list) == 0:
         print ("No job runs on {} ".format(prow_ci_name))
 
@@ -438,9 +434,11 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
         e2e_test_result = e2e_monitor_result = False
         cluster_status=cluster_deploy_status(job)
         i=i+1
-        print(i,".","Job ID: ",job_id)
-        print("Job link: https://prow.ci.openshift.org/"+job)
-        get_quota_and_nightly(job)
+        job_dict = {}
+        job_dict["Build"] = prow_ci_name
+        job_dict["Prow Job ID"] = job_id
+        job_dict["Install Status"] = cluster_status
+        job_dict["Lease"], _ = get_quota_and_nightly(job)
         
         if cluster_status == 'SUCCESS' and "4.15" not in prow_ci_link:
             deploy_count += 1
@@ -449,11 +447,11 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
             if isinstance(e2e_test_result,list):
                 if len(e2e_test_result) == 0:
                     e2e_count += 1
-                    print("All e2e testcases passed")
+                    job_dict["Test result"] = "PASS"   
                 elif len(e2e_test_result) != 0:
-                    print(len(e2e_test_result),"testcases failed")
+                    job_dict["Test result"] = str(len(e2e_test_result)) + " testcases failed"   
             elif isinstance(e2e_test_result,str):
-                print(e2e_test_result)
+                job_dict["Test result"] = e2e_test_result
 
         elif cluster_status == 'SUCCESS' and "4.15" in prow_ci_link:
             deploy_count += 1
@@ -463,41 +461,26 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
             if isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,list):        
                 total_e2e_failure = len(e2e_test_result)+len(e2e_monitor_result)
                 if total_e2e_failure != 0:
-                    print(total_e2e_failure,"testcases failed")
+                    job_dict["Test result"] = str(total_e2e_failure) + " testcases failed"
                 elif total_e2e_failure == 0:
                     e2e_count += 1
-                    print("All e2e testcases passed")
-            elif isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,str):
-                print(e2e_monitor_result) #prints the error message recived while fetching monitor testcase results
+                    job_dict["Test result"] = "PASS"
+            elif isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,str): 
+                job_dict["Test result"] = e2e_monitor_result #the error message received while fetching monitor testcase results
                 if len(e2e_test_result) !=0:
-                    print(len(e2e_test_result), "conformance testcases failed")
+                    job_dict["Test result"] += str(len(e2e_test_result)) + " conformance testcases failed"
                 elif len(e2e_test_result) == 0:
-                    print("All conformance e2e testcases passed")
+                    job_dict["Test result"] += "PASS"
             elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,list):
-                print(e2e_test_result) #prints the error message recived while fetching conformance testcase results
+                job_dict["Test result"] = e2e_test_result #the error message received while fetching conformance testcase results
                 if len(e2e_monitor_result) !=0:
-                    print(len(e2e_monitor_result), "monitor testcases failed")
+                    job_dict["Test result"] += str(len(e2e_monitor_result)) + " monitor testcases failed"
                 elif len(e2e_monitor_result) == 0:
-                    print("All monitor e2e testcases passed")
+                    job_dict["Test result"] += "PASS"
             elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,str):
-                print(e2e_test_result)
-                print(e2e_monitor_result)
-
-        elif cluster_status == 'FAILURE':
-                print("Cluster Creation Failed")
-                cluster_creation_error_analysis(job)
-
-        elif cluster_status == 'ERROR':
-            print('Unable to get cluster status please check prowCI UI ')
-
-        print("\n")
-        
-    if len(job_list) != 0:
-        print ("\n{}/{} deploys succeeded".format(deploy_count, len(job_list)))
-        print ("{}/{} e2e tests succeeded".format(e2e_count, len(job_list)))
-        
-
-        print("--------------------------------------------------------------------------------------------------")
+                job_dict["Test result"] += e2e_test_result + " " + e2e_monitor_result
+        summary_list.append(job_dict)
+    return summary_list
 
 def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
 
@@ -531,7 +514,8 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
         i=i+1
         print(i,".","Job ID: ",job_id)
         print("Job link: https://prow.ci.openshift.org/"+job)
-        get_quota_and_nightly(job)
+        lease, nightly = get_quota_and_nightly(job)
+        print("Lease Quota-", lease, "Nightly info-", nightly)
         check_node_crash(job)
         node_status = get_node_status(job)
         print(node_status)

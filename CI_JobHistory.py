@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import urllib3
+from tabulate import tabulate
 import re
 import json
 from datetime import datetime
@@ -93,9 +94,11 @@ def temp_main(config_data):
                     check_for_node_crashes(spy_links)
             
             if option == '2':
+                summary_list = []
                 for ci_name,ci_link in ci_list.items():
-                    monitor.get_brief_job_info(ci_name,ci_link,start_date,end_date)
+                    summary_list.extend(monitor.get_brief_job_info(ci_name,ci_link,start_date,end_date))
                     monitor.final_job_list = []
+                print(tabulate(summary_list, headers='keys', tablefmt="pipe", stralign='left'))
             
             if option == '3':
                 for ci_name,ci_link in ci_list.items():
