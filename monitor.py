@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import urllib3
 import requests
 from datetime import datetime
+import xml.etree.ElementTree as ET
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -265,6 +266,21 @@ def get_failed_e2e_testcases(spy_link,job_type):
             return "Test summary file not found"
     else:
         return "Failed to get response from e2e-test directory url" 
+
+def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
+    test_log_junit_dir_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/gather-extra/artifacts/junit/junit_symptoms.xml"
+    symptom_detection_failed_testcase = []
+    response = requests.get(test_log_junit_dir_url,verify=False,timeout=15)
+    if response.status_code == 200:
+        root = ET.fromstring(response.content)
+        for testcase in root.findall('.//testcase'):
+            testcase_name = testcase.get('name')
+            if testcase.find('failure') is not None:
+                symptom_detection_failed_testcase.append(testcase_name)
+        return symptom_detection_failed_testcase
+    else:
+        return 'Error fetching junit symptom detection test results'
+
 
 def print_e2e_testcase_failures(spylink,jobtype):
     e2e_result = False
