@@ -478,7 +478,7 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
                 elif len(e2e_monitor_result) == 0:
                     job_dict["Test result"] += "PASS"
             elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,str):
-                job_dict["Test result"] += e2e_test_result + " " + e2e_monitor_result
+                job_dict["Test result"] = e2e_test_result + " " + e2e_monitor_result
         summary_list.append(job_dict)
     return summary_list
 
