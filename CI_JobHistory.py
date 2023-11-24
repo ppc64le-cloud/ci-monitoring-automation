@@ -38,6 +38,27 @@ def check_for_node_crashes(job_list):
             print(job_id,node_status)
         monitor.check_node_crash(url)
 
+def get_failed_testcases(spylinks):
+    pattern = r'/(\d+)'
+    j=0
+    for spylink in spylinks:
+        match = re.search(pattern, spylink)
+        job_id = match.group(1)
+        job_type,_ = monitor.job_classifier(spylink)
+        cluster_status=monitor.cluster_deploy_status(spylink)
+        if cluster_status == 'SUCCESS' and "4.15" not in spylink:
+            j=j+1
+            print(str(j)+".",job_id)
+            monitor.print_e2e_testcase_failures(spylink,job_type)
+            print("\n")
+        elif cluster_status == 'SUCCESS' and "4.15" in spylink:
+            j=j+1
+            print(str(j)+".",job_id)
+            monitor.print_e2e_testcase_failures(spylink,job_type)
+            monitor.print_monitor_testcase_failures(spylink,job_type)
+    print("--------------------------------------------------------------------------------------------------")
+    print("\n")
+
 def display_ci_links(config_data):
     j=0
 
@@ -84,6 +105,8 @@ def temp_main(config_data):
             print("1. Node Status")
             print("2. Brief Job information")
             print("3. Detailed Job information")
+            print("4. Failed testcases")
+
             option = input("Enter the option: ")
     
             if option == '1':
@@ -103,6 +126,14 @@ def temp_main(config_data):
             if option == '3':
                 for ci_name,ci_link in ci_list.items():
                     monitor.get_detailed_job_info(ci_name,ci_link,start_date,end_date)
+                    monitor.final_job_list = []
+            
+            if option == '4':
+                for ci_name,ci_link in ci_list.items():
+                    print("-------------------------------------------------------------------------------------------------")
+                    print(ci_name)
+                    spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
+                    get_failed_testcases(spy_links)
                     monitor.final_job_list = []
 
 temp_main(config_data)
