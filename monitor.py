@@ -5,7 +5,6 @@ import urllib3
 import requests
 from datetime import datetime
 
-
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 with open('config.json') as config_file:
@@ -275,7 +274,7 @@ def print_e2e_testcase_failures(spylink,jobtype):
             print("All e2e conformance test cases passed")
             e2e_result = True
         else:
-            print("Failed conformance testcases: ")
+            print("Failed testcases: ")
             for e in e2e_failures:
                 print(e["Test"]["Name"])
     elif isinstance(e2e_failures,str):
@@ -515,7 +514,7 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
         print(i,".","Job ID: ",job_id)
         print("Job link: https://prow.ci.openshift.org/"+job)
         lease, nightly = get_quota_and_nightly(job)
-        print("Lease Quota-", lease, "Nightly info-", nightly)
+        print("Lease Quota-", lease,"\nNightly info-", nightly)
         check_node_crash(job)
         node_status = get_node_status(job)
         print(node_status)
