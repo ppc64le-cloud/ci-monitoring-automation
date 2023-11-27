@@ -366,12 +366,11 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
                             job_log_path = ele["SpyglassLink"]
                             final_job_list.append(job_log_path)
 
-                    next_page_link = 'https://prow.ci.openshift.org'+next_link
-                    
-                    check=get_next_page_first_build_date(next_page_link,end_date)
+                    next_page_spylink=next_link[35:]
+                    check=get_next_page_first_build_date(next_page_spylink,end_date)
                     
                     if check == True:
-                        get_jobs_with_date(next_page_link,start_date,end_date)
+                        get_jobs_with_date(next_page_spylink,start_date,end_date)
                     elif check == 'ERROR':
                         print("Error while fetching the job-links please check the UI")
                     return final_job_list
@@ -385,7 +384,9 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
 
 #Checks if the jobs next page are in the given date range
  
-def get_next_page_first_build_date(ci_next_page_link,end_date):
+def get_next_page_first_build_date(ci_next_page_spylink,end_date):
+
+    ci_next_page_link = 'https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/' + ci_next_page_spylink
 
     response = requests.get(ci_next_page_link, verify=False, timeout=15)
     if response.status_code == 200:
