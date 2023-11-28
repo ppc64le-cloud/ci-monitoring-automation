@@ -12,7 +12,6 @@ The ci-monitoring-automation Repository is a collection of Python scripts design
 ```
 Python3
 pip
-virtualenv
 ```
 
 
@@ -21,8 +20,7 @@ virtualenv
 ```
 git clone https://github.com/SurajGudaji/ci-monitoring-automation.git
 cd ci-monitoring-automation
-Activate virtualenv in ci-monitoring-automation folder
-pip install -r requirements.txt
+Create a virtualenv if required and install required packages using pip install -r requirements.txt
 ```
 
 ### Usage
