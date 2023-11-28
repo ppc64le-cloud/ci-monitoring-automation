@@ -108,6 +108,8 @@ def temp_main(config_data):
             print("4. Failed testcases")
 
             option = input("Enter the option: ")
+
+            print("Checking runs from",end_date,"to",start_date)
     
             if option == '1':
                 for ci_name,ci_link in ci_list.items():
