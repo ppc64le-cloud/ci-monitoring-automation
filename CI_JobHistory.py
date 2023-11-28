@@ -13,8 +13,8 @@ with open('config.json') as config_file:
 
 
 def get_date_input():
-    date_str_1 = input("Enter Before(From) date (YYYY-MM-DD): ") #example  2023-11-14
-    date_str_2 = input("Enter After(to) date (YYYY-MM-DD): ")  #example  2023-11-13
+    date_str_1 = input("Enter Before date (YYYY-MM-DD): ") #example  2023-11-14
+    date_str_2 = input("Enter After date (YYYY-MM-DD): ")  #example  2023-11-13
     try:
         start_date = datetime.strptime(date_str_1,"%Y-%m-%d")
         end_date = datetime.strptime(date_str_2,"%Y-%m-%d")
