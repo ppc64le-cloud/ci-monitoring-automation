@@ -333,7 +333,8 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
         td_element2 = str(td_element)
         next_link_pattern = r'/job[^>"]*'
         next_link_match = re.search(next_link_pattern,td_element2)
-        next_link = next_link_match.group()
+        if next_link_match != None:
+            next_link = next_link_match.group()
 
         script_elements = soup.find_all('script')
         selected_script_element = None
@@ -366,13 +367,14 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
                             job_log_path = ele["SpyglassLink"]
                             final_job_list.append(job_log_path)
 
-                    next_page_spylink=next_link[35:]
-                    check=get_next_page_first_build_date(next_page_spylink,end_date)
+                    if next_link_match != None:
+                        next_page_spylink=next_link[35:]
+                        check=get_next_page_first_build_date(next_page_spylink,end_date)
                     
-                    if check == True:
-                        get_jobs_with_date(next_page_spylink,start_date,end_date)
-                    elif check == 'ERROR':
-                        print("Error while fetching the job-links please check the UI")
+                        if check == True:
+                            get_jobs_with_date(next_page_spylink,start_date,end_date)
+                        elif check == 'ERROR':
+                            print("Error while fetching the job-links please check the UI")
                     return final_job_list
                 except json.JSONDecodeError as e:
                     print("Failed to extract data from the script tag")
