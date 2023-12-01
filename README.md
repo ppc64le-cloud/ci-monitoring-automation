@@ -18,9 +18,9 @@ pip
 ### Installation
 
 ```
-git clone https://github.com/SurajGudaji/ci-monitoring-automation.git
+git clone https://github.com/ocp-power-automation/ci-monitoring-automation.git
 cd ci-monitoring-automation
-Create a virtualenv if required and install required packages using pip install -r requirements.txt
+Create a virtualenv if required and install required packages using "pip install -r requirements.txt"
 ```
 
 ### Usage
