@@ -5,11 +5,9 @@ import re
 import json
 from datetime import datetime
 import monitor
+import argparse
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-with open('config.json') as config_file:
-    config_data = json.load(config_file)
 
 
 def get_date_input():
@@ -94,12 +92,27 @@ def display_ci_links(config_data):
     return selected_config_data
 
 
-def temp_main(config_data):
+def temp_main():
+
+    parser = argparse.ArgumentParser(description='Load JSON configuration file based on command line arguement')
+    parser.add_argument('--ci_arch', default='p', choices=['p','z'], help='Specify the CI architecture type (p or z), default is p')
+    args = parser.parse_args()
+
+    if args.ci_arch == 'p':
+        config_file = 'p_config.json'
+    elif args.ci_arch == 'z':
+        config_file = 'z_config.json'
+    else:
+        print("Invalid arguement. Please use p or z")
+        return 
+    
+    config_data = monitor.load_config(config_file)
     ci_list = display_ci_links(config_data)
 
 
     if isinstance(ci_list,dict):
         start_date,end_date = get_date_input()
+        
         if start_date != None and end_date != None:
             print("Please select one of the option from Job History functionalities: ")
             print("1. Node Status")
@@ -138,4 +151,4 @@ def temp_main(config_data):
                     get_failed_testcases(spy_links)
                     monitor.final_job_list = []
 
-temp_main(config_data)
+temp_main()
