@@ -1,4 +1,3 @@
-import json
 from bs4 import BeautifulSoup
 import urllib3
 from tabulate import tabulate
@@ -9,7 +8,7 @@ import argparse
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-def new_main():
+def main():
     parser = argparse.ArgumentParser(description='Load JSON configuration file and specifies if user needs brief/detailed job information')
     parser.add_argument('--info_type', default='brief', help='specify the job info type')
     parser.add_argument('--ci_arch', default='p', choices=['p','z'], help='Specify the CI architecture type (p or z), default is p')
@@ -19,7 +18,7 @@ def new_main():
     elif args.ci_arch == 'z':
         config_file = 'z_config.json'
     else:
-        print("Invalid arguement. Please use p or z")
+        print("Invalid argument. Please use p or z")
         return
     config_data = monitor.load_config(config_file)
     if args.info_type == "brief":
@@ -31,4 +30,5 @@ def new_main():
         for ci_name,ci_link in config_data.items():
             monitor.get_detailed_job_info(ci_name,ci_link)
 
-new_main()
+if __name__ == "__main__":
+    main()

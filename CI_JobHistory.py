@@ -2,7 +2,6 @@ from bs4 import BeautifulSoup
 import urllib3
 from tabulate import tabulate
 import re
-import json
 from datetime import datetime
 import monitor
 import argparse
@@ -92,7 +91,7 @@ def display_ci_links(config_data):
     return selected_config_data
 
 
-def temp_main():
+def main():
 
     parser = argparse.ArgumentParser(description='Load JSON configuration file based on command line arguement')
     parser.add_argument('--ci_arch', default='p', choices=['p','z'], help='Specify the CI architecture type (p or z), default is p')
@@ -103,7 +102,7 @@ def temp_main():
     elif args.ci_arch == 'z':
         config_file = 'z_config.json'
     else:
-        print("Invalid arguement. Please use p or z")
+        print("Invalid argument. Please use p or z")
         return 
     
     config_data = monitor.load_config(config_file)
@@ -130,6 +129,7 @@ def temp_main():
                     print(ci_name)
                     spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
                     check_for_node_crashes(spy_links)
+                    monitor.final_job_list = []
             
             if option == '2':
                 summary_list = []
@@ -151,4 +151,5 @@ def temp_main():
                     get_failed_testcases(spy_links)
                     monitor.final_job_list = []
 
-temp_main()
+if __name__ == "__main__":
+    main()

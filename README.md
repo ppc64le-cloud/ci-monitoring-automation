@@ -41,4 +41,7 @@ Create a virtualenv if required and install required packages using "pip install
     ```python3 CI_JobHistory.py```
 
 
-3. **config.json:** The config.json file will have ci name and ci link in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
+3. **p_config.json:** The p_config.json file will have ci name and ci links of ppc64le architecture CI in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
+
+
+4. **z_config.json:** The p_config.json file will have ci name and ci links of s390x architecture CI in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
