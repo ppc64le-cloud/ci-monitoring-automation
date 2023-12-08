@@ -23,25 +23,45 @@ def get_date_input():
         return None
 
 
-def check_for_node_crashes(job_list):
-    pattern = r'/(\d+)'
-    
+def check_for_node_crashes(job_list, zone):
+    """
+    Check for node crash across all the provided job list
+ 
+    Args:
+        job_list (list): List of jobs which needs to be checked.
+        zone (list): List of the zones/leases that need to checked.
+    """
+    pattern = r'/(\d+)'   
     for url in job_list:
         match = re.search(pattern, url)
         job_id = match.group(1)
+        lease,_ = monitor.get_quota_and_nightly(url)
+        if zone is not None and lease not in zone :
+            continue
         cluster_deploy_status = monitor.cluster_deploy_status(url)
         if cluster_deploy_status == 'SUCCESS':
             node_status = monitor.get_node_status(url)
             print(job_id,node_status)
         monitor.check_node_crash(url)
 
-def get_failed_testcases(spylinks):
+def get_failed_testcases(spylinks, zone):
+    """
+    To get all the failed tescases in all the provided job list
+ 
+    Args:
+        spylinks (list): List of jobs which needs to be checked.
+        zone (list): List of the zones/leases that need to checked.
+    """
+
     pattern = r'/(\d+)'
     j=0
     for spylink in spylinks:
         match = re.search(pattern, spylink)
         job_id = match.group(1)
         job_type,_ = monitor.job_classifier(spylink)
+        lease,_ = monitor.get_quota_and_nightly(spylink)
+        if zone is not None and lease not in zone :
+            continue
         cluster_status=monitor.cluster_deploy_status(spylink)
         if cluster_status == 'SUCCESS' and "4.15" not in spylink:
             j=j+1
@@ -134,13 +154,13 @@ def main():
             if option == '2':
                 summary_list = []
                 for ci_name,ci_link in ci_list.items():
-                    summary_list.extend(monitor.get_brief_job_info(ci_name,ci_link,start_date,end_date))
+                    summary_list.extend(monitor.get_brief_job_info(ci_name,ci_link,start_date,end_date,zone=args.zone))
                     monitor.final_job_list = []
                 print(tabulate(summary_list, headers='keys', tablefmt="pipe", stralign='left'))
             
             if option == '3':
                 for ci_name,ci_link in ci_list.items():
-                    monitor.get_detailed_job_info(ci_name,ci_link,start_date,end_date)
+                    monitor.get_detailed_job_info(ci_name,ci_link,start_date,end_date,zone=args.zone)
                     monitor.final_job_list = []
             
             if option == '4':
@@ -148,7 +168,7 @@ def main():
                     print("-------------------------------------------------------------------------------------------------")
                     print(ci_name)
                     spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
-                    get_failed_testcases(spy_links)
+                    get_failed_testcases(spy_links,zone=args.zone)
                     monitor.final_job_list = []
 
 if __name__ == "__main__":

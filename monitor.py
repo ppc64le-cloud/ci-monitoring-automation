@@ -456,7 +456,8 @@ def get_next_page_first_build_date(ci_next_page_spylink,end_date):
         print("Failed to get the prowCI response")
         return 'ERROR'
 
-def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
+def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,zone=None):
+    
 
     if start_date is not None and end_date is not None:
         job_list = get_jobs_with_date(prow_ci_link,start_date,end_date)
@@ -479,6 +480,9 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
     for job in job_list:
         match = re.search(pattern_job_id, job)
         job_id = match.group(1)
+        lease, _ = get_quota_and_nightly(job)
+        if zone is not None and lease not in zone :
+            continue
         e2e_test_result = e2e_monitor_result = False
         cluster_status=cluster_deploy_status(job)
         i=i+1
@@ -486,7 +490,7 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
         job_dict["Build"] = prow_ci_name
         job_dict["Prow Job ID"] = job_id
         job_dict["Install Status"] = cluster_status
-        job_dict["Lease"], _ = get_quota_and_nightly(job)
+        job_dict["Lease"]=lease
         
         if cluster_status == 'SUCCESS' and "4.15" not in prow_ci_link:
             deploy_count += 1
@@ -530,23 +534,19 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
         summary_list.append(job_dict)
     return summary_list
 
-def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None):
+def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,zone=None):
 
     if start_date is not None and end_date is not None:
         job_list = get_jobs_with_date(prow_ci_link,start_date,end_date)
     else:
         job_list = get_jobs(prow_ci_link)
-
-    print("-------------------------------------------------------------------------------------------------")
-
+    print("--------------------------------------------------------------------------------------------------")
     print(prow_ci_name)
 
     if isinstance(job_list,str):
         print(job_list)
         return 1
         
-    if len(job_list) == 0:
-        print ("No job runs on {} ".format(prow_ci_name))
 
     deploy_count = 0
     e2e_count = 0
@@ -554,15 +554,20 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
 
     pattern_job_id =  r'/(\d+)'
 
+    jobs_to_deleted = []
     for job in job_list:
         match = re.search(pattern_job_id, job)
         job_id = match.group(1)
         e2e_test_result = e2e_monitor_result = False
+        lease, nightly = get_quota_and_nightly(job)
+        if zone is not None and lease not in zone:
+            jobs_to_deleted.append(job)
+            continue
         cluster_status=cluster_deploy_status(job)
         i=i+1
         print(i,".","Job ID: ",job_id)
         print("Job link: https://prow.ci.openshift.org/"+job)
-        lease, nightly = get_quota_and_nightly(job)
+        
         print("Lease Quota-", lease,"\nNightly info-", nightly)
         check_node_crash(job)
         node_status = get_node_status(job)
@@ -623,9 +628,11 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
 
         print("\n")
         
+    job_list = list(set(job_list) - set(jobs_to_deleted))
     if len(job_list) != 0:
         print ("\n{}/{} deploys succeeded".format(deploy_count, len(job_list)))
         print ("{}/{} e2e tests succeeded".format(e2e_count, len(job_list)))
-        
-
         print("--------------------------------------------------------------------------------------------------")
+    else:
+        print ("No job runs on {} ".format(prow_ci_name))
+    

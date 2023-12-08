@@ -24,11 +24,11 @@ def main():
     if args.info_type == "brief":
         summary_list = []
         for ci_name,ci_link in config_data.items():
-            summary_list.extend(monitor.get_brief_job_info(ci_name,ci_link))
+            summary_list.extend(monitor.get_brief_job_info(ci_name,ci_link,zone=args.zone))
         print(tabulate(summary_list, headers='keys', tablefmt="pipe", stralign='left'))
     elif args.info_type == "detailed":
         for ci_name,ci_link in config_data.items():
-            monitor.get_detailed_job_info(ci_name,ci_link)
+            monitor.get_detailed_job_info(ci_name,ci_link,zone=args.zone)
 
 if __name__ == "__main__":
     main()
