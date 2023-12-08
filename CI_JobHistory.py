@@ -115,6 +115,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='Load JSON configuration file based on command line arguement')
     parser.add_argument('--ci_arch', default='p', choices=['p','z'], help='Specify the CI architecture type (p or z), default is p')
+    parser.add_argument('--zone', help='specify the lease/zone', type= lambda arg:arg.split(','))
     args = parser.parse_args()
 
     if args.ci_arch == 'p':
@@ -147,8 +148,8 @@ def main():
                 for ci_name,ci_link in ci_list.items():
                     print("-------------------------------------------------------------------------------------------------")
                     print(ci_name)
-                    spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
-                    check_for_node_crashes(spy_links)
+                    spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date,zone=args.zone)
+                    check_for_node_crashes(spy_links,zone=args.zone)
                     monitor.final_job_list = []
             
             if option == '2':

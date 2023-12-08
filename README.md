@@ -51,7 +51,7 @@ Create a virtualenv if required and install required packages using "pip install
 
     1. The CI_JobHistory.py when invoked with command line argument zone, it will get all builds that ran in the particular zone.
 
-    ```python3 CI_JobHistory.py --zone syd04```
+        ```python3 CI_JobHistory.py --zone syd04```
 
 
 3. **p_config.json:** The p_config.json file will have ci name and ci links of ppc64le architecture CI in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.

@@ -12,6 +12,7 @@ def main():
     parser = argparse.ArgumentParser(description='Load JSON configuration file and specifies if user needs brief/detailed job information')
     parser.add_argument('--info_type', default='brief', help='specify the job info type')
     parser.add_argument('--ci_arch', default='p', choices=['p','z'], help='Specify the CI architecture type (p or z), default is p')
+    parser.add_argument('--zone', help='specify the lease/zone', type= lambda arg:arg.split(','))
     args = parser.parse_args()
     if args.ci_arch == 'p':
         config_file = 'p_config.json'
