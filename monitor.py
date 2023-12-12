@@ -8,8 +8,10 @@ import xml.etree.ElementTree as ET
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-with open('config.json') as config_file:
-    config_data = json.load(config_file)
+def load_config(config_file):
+    with open(config_file,'r') as config_file:
+        config = json.load(config_file)
+    return config 
 
 def get_current_date():
     return datetime.now().date()
@@ -152,47 +154,74 @@ def check_node_crash(spy_link):
 def get_quota_and_nightly(spy_link):
     _,job_platform = job_classifier(spy_link)
 
-    build_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/build-log.txt"
-    if job_platform == "libvirt":
-        job_platform+="-ppc64le"
-    elif job_platform == "powervs":
-        job_platform+="-[1-9]"
 
-    zone_log_re = re.compile('(Acquired 1 lease\(s\) for {}-quota-slice: \[)([^]]+)(\])'.format(job_platform), re.MULTILINE|re.DOTALL)
-    build_log_response = requests.get(build_log_url, verify=False, timeout=15)
-    zone_log_match = zone_log_re.search(build_log_response.text)
-    if zone_log_match is None:
-        lease = "Failed to fetch lease information"
-    else:
-        lease = zone_log_match.group(2)
+    if 'ppc64le' in spy_link:
+        build_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/build-log.txt"
+        if job_platform == "libvirt":
+            job_platform+="-ppc64le"
+        elif job_platform == "powervs":
+            job_platform+="-[1-9]"
+
+        zone_log_re = re.compile('(Acquired 1 lease\(s\) for {}-quota-slice: \[)([^]]+)(\])'.format(job_platform), re.MULTILINE|re.DOTALL)
+        build_log_response = requests.get(build_log_url, verify=False, timeout=15)
+        zone_log_match = zone_log_re.search(build_log_response.text)
+        if zone_log_match is None:
+            lease = "Failed to fetch lease information"
+        else:
+            lease = zone_log_match.group(2)
     # Fetch the nightly information for non-upgrade jobs
-    if "upgrade" not in build_log_url:
-        nightly_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
+        if "upgrade" not in build_log_url:
+            nightly_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
+            nightly_log_match = nightly_log_re.search(build_log_response.text)
+            if nightly_log_match is None:
+                rc_nightly_log_re = re.compile('(Using explicitly provided pull-spec for release ppc64le-latest \((\S+)\))', re.MULTILINE|re.DOTALL)
+                rc_nightly_log_match = rc_nightly_log_re.search(build_log_response.text)
+                if rc_nightly_log_match is None:
+                    nightly = "Unable to fetch nightly information- No match found"
+                else:
+                    nightly = rc_nightly_log_match.group(2)
+            else:
+                nightly = "ppc64le-latest-"+ nightly_log_match.group(2)
+    # Fetch nightly information for upgrade jobs- fetch both ppc64le-initial and ppc64le-latest
+        else:
+            nightly_initial_log_re = re.compile('(Resolved release ppc64le-initial to (\S+))', re.MULTILINE|re.DOTALL)
+            nightly_initial_log_match = nightly_initial_log_re.search(build_log_response.text)
+            if nightly_initial_log_match is None:
+                nightly = "Unable to fetch nightly ppc64le-initial information- No match found"
+            else:
+                nightly = "ppc64le-initial-"+ nightly_initial_log_match.group(2)
+            nightly_latest_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
+            nightly_latest_log_match = nightly_latest_log_re.search(build_log_response.text)
+            if nightly_latest_log_match is None:
+                nightly = nightly + " Unable to fetch nightly ppc64le-latest information- No match found"
+            else:
+                nightly = nightly + " ppc64le-latest-"+ nightly_latest_log_match.group(2)
+        return lease, nightly
+    
+    elif 's390x' in spy_link:
+        build_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/build-log.txt"
+        if job_platform == "libvirt":
+            job_platform+="-s390x"
+
+        zone_log_re = re.compile('(Acquired 1 lease\(s\) for {}-quota-slice: \[)([^]]+)(\])'.format(job_platform), re.MULTILINE|re.DOTALL)
+        build_log_response = requests.get(build_log_url, verify=False, timeout=15)
+        zone_log_match = zone_log_re.search(build_log_response.text)
+        if zone_log_match is None:
+            lease = "Failed to fetch lease information"
+        else:
+            lease = zone_log_match.group(2)
+        nightly_log_re = re.compile('(Resolved release s390x-latest to (\S+))', re.MULTILINE|re.DOTALL)
         nightly_log_match = nightly_log_re.search(build_log_response.text)
         if nightly_log_match is None:
-            rc_nightly_log_re = re.compile('(Using explicitly provided pull-spec for release ppc64le-latest \((\S+)\))', re.MULTILINE|re.DOTALL)
+            rc_nightly_log_re = re.compile('(Using explicitly provided pull-spec for release s390x-latest \((\S+)\))', re.MULTILINE|re.DOTALL)
             rc_nightly_log_match = rc_nightly_log_re.search(build_log_response.text)
             if rc_nightly_log_match is None:
                 nightly = "Unable to fetch nightly information- No match found"
             else:
                 nightly = rc_nightly_log_match.group(2)
         else:
-            nightly = "ppc64le-latest-"+ nightly_log_match.group(2)
-    # Fetch nightly information for upgrade jobs- fetch both ppc64le-initial and ppc64le-latest
-    else:
-        nightly_initial_log_re = re.compile('(Resolved release ppc64le-initial to (\S+))', re.MULTILINE|re.DOTALL)
-        nightly_initial_log_match = nightly_initial_log_re.search(build_log_response.text)
-        if nightly_initial_log_match is None:
-            nightly = "Unable to fetch nightly ppc64le-initial information- No match found"
-        else:
-            nightly = "ppc64le-initial-"+ nightly_initial_log_match.group(2)
-        nightly_latest_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
-        nightly_latest_log_match = nightly_latest_log_re.search(build_log_response.text)
-        if nightly_latest_log_match is None:
-            nightly = nightly + " Unable to fetch nightly ppc64le-latest information- No match found"
-        else:
-            nightly = nightly + " ppc64le-latest-"+ nightly_latest_log_match.group(2)
-    return lease, nightly
+            nightly = "s390x-latest-"+ nightly_log_match.group(2)
+        return lease, nightly
 
 def job_classifier(spy_link):
 

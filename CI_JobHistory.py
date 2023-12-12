@@ -9,8 +9,7 @@ import argparse
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-with open('config.json') as config_file:
-    config_data = json.load(config_file)
+
 
 
 def get_date_input():
@@ -115,11 +114,23 @@ def display_ci_links(config_data):
     return selected_config_data
 
 
-def temp_main(config_data):
+def main():
     parser = argparse.ArgumentParser(description='Get the job history')
     parser.add_argument('--zone', help='specify the lease/zone', type= lambda arg:arg.split(','))
+    parser.add_argument('--ci_arch', default='p', choices=['p','z'], help='Specify the CI architecture type (p or z), default is p')
 
     args = parser.parse_args()
+
+    if args.ci_arch == 'p':
+        config_file = 'p_config.json'
+    elif args.ci_arch == 'z':
+        config_file = 'z_config.json'
+    else:
+        print("Invalid argument. Please use p or z")
+        return 
+
+    config_data = monitor.load_config(config_file)
+
     ci_list = display_ci_links(config_data)
 
 
@@ -142,6 +153,7 @@ def temp_main(config_data):
                     print(ci_name)
                     spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
                     check_for_node_crashes(spy_links,zone=args.zone)
+                    monitor.final_job_list = []
             
             if option == '2':
                 summary_list = []
@@ -163,4 +175,5 @@ def temp_main(config_data):
                     get_failed_testcases(spy_links,zone=args.zone)
                     monitor.final_job_list = []
 
-temp_main(config_data)
+if __name__ == "__main__":
+    main()
