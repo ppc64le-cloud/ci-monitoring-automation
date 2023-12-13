@@ -344,6 +344,35 @@ def print_monitor_testcase_failures(spylink,jobtype):
 
 final_job_list=[]
 
+def check_testcase_failure(spylink,job_type,testcase_name):
+    """
+    Check if a particular testcase is failed in the build.
+
+    Args:
+        spylink (string): Build which needs to be checked.
+        job_type (string): Job type (libvirt or powervs)
+        testcase_name (string): Name of the testcase.
+    Return:
+        return True if testcase failed in this particular build else return False.
+    """
+    failed_tcs = get_failed_e2e_testcases(spylink,job_type)
+    monitor_tcs = get_failed_monitor_testcases(spylink,job_type)
+    if isinstance(failed_tcs,list):
+        for tc in failed_tcs:
+            if testcase_name in tc['Test']['Name']:
+                return True
+    elif isinstance(failed_tcs,str):
+        if testcase_name in failed_tcs:
+            return True
+
+    if isinstance(monitor_tcs,list):
+        for tc in monitor_tcs:
+            if testcase_name in tc['Test']['Name']:
+                return True
+    elif isinstance(monitor_tcs,str):
+        if testcase_name in monitor_tcs:
+            return True
+    return False
 
 #fetches all the job spylinks in the given date range
 
