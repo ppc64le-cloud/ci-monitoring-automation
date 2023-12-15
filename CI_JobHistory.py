@@ -79,6 +79,34 @@ def get_failed_testcases(spylinks, zone):
     print("--------------------------------------------------------------------------------------------------")
     print("\n")
 
+def get_testcase_failure(spylinks, zone, tc_name):
+    """
+    To get all the builds with the particular testcase failure.
+
+    Args:
+        spylinks (list): list of builds which needs to be checked.
+        zone (list): List of the zones/leases that need to checked.
+        tc_name (string): Name of the testcase.
+    """
+    pattern = r'/(\d+)'
+    j=0
+    for spylink in spylinks:
+        match = re.search(pattern, spylink)
+        job_id = match.group(1)
+        job_type,_ = monitor.job_classifier(spylink)
+        lease,_ = monitor.get_quota_and_nightly(spylink)
+        if zone is not None and lease not in zone :
+            continue
+        cluster_status=monitor.cluster_deploy_status(spylink)
+        if cluster_status == 'SUCCESS':
+                if monitor.check_testcase_failure(spylink,job_type,tc_name):
+                    j=j+1
+                    print(str(j)+"."+"Job_id: "+job_id)
+                    print("https://prow.ci.openshift.org"+ spylink)
+                    print("\n")
+    print("--------------------------------------------------------------------------------------------------")
+    print("\n")
+
 def display_ci_links(config_data):
     j=0
 
@@ -142,6 +170,7 @@ def main():
             print("2. Brief Job information")
             print("3. Detailed Job information")
             print("4. Failed testcases")
+            print("5. Get builds with testcase failure")
 
             option = input("Enter the option: ")
 
@@ -174,6 +203,20 @@ def main():
                     spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
                     get_failed_testcases(spy_links,zone=args.zone)
                     monitor.final_job_list = []
+            
+            if option == '5':
+                tc_name = input("Enter the testcase names comma seperated: ")
+                tc_list =  tc_name.split(",")
+
+                for ci_name,ci_link in ci_list.items():
+                    print("-------------------------------------------------------------------------------------------------")
+                    print(ci_name)
+                    spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
+                    for tc in tc_list:
+                        print("TESTCASE NAME: " + tc)
+                        get_testcase_failure(spy_links,zone=args.zone,tc_name=tc)
+                    monitor.final_job_list = []
 
 if __name__ == "__main__":
     main()
+
