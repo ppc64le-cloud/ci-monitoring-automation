@@ -2,19 +2,30 @@ from bs4 import BeautifulSoup
 import urllib3
 from tabulate import tabulate
 import re
-import json
 from datetime import datetime
 import monitor
 import argparse
+import configparser
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+config_vars = configparser.ConfigParser()
+
+config_vars.read('config.ini')
+
+JENKINS = config_vars.get('Settings', 'JENKINS')
 
 
 
 def get_date_input():
-    date_str_1 = input("Enter Before date (YYYY-MM-DD): ") #example  2023-11-14
-    date_str_2 = input("Enter After date (YYYY-MM-DD): ")  #example  2023-11-13
+
+    if JENKINS == "False":
+        date_str_1 = input("Enter Before date (YYYY-MM-DD): ") #example  2023-11-14
+        date_str_2 = input("Enter After date (YYYY-MM-DD): ")  #example  2023-11-13
+    elif JENKINS == "True":
+        date_str_1 = config_vars.get('Settings', 'before_date')
+        date_str_2 = config_vars.get('Settings', 'after_date')
+
     try:
         start_date = datetime.strptime(date_str_1,"%Y-%m-%d")
         end_date = datetime.strptime(date_str_2,"%Y-%m-%d")
@@ -111,28 +122,38 @@ def display_ci_links(config_data):
     j=0
 
     ci_name_list = []
-
-    for ci_name in config_data.keys():
-        j=j+1
-        ci_name_list.append(ci_name)
-        print(j,'',ci_name)
-
-    option = input("Select the required ci's serial number with a space ")
-    selected_options = option.split()
     options_int_list = []
     selected_config_data = {}
+
+    if JENKINS == "False":
+        for ci_name in config_data.keys():
+            j=j+1
+            ci_name_list.append(ci_name)
+            print(j,'',ci_name)
+
+        option = input("Select the required ci's serial number with a space ")
+
+        selected_options = option.split()
+
    
-    for ci in selected_options:
-        try:
-            ci_to_int = int(ci)
-            if 0 < ci_to_int <= len(config_data):
-                options_int_list.append(ci_to_int)
-            else:
-                return_value = "Enter the options in range of 1 to " + str(len(config_data))
-                print(return_value)
-                return "ERROR"
-        except ValueError:
-            return "Enter valid options"
+        for ci in selected_options:
+            try:
+                ci_to_int = int(ci)
+                if 0 < ci_to_int <= len(config_data):
+                    options_int_list.append(ci_to_int)
+                else:
+                    return_value = "Enter the options in range of 1 to " + str(len(config_data))
+                    print(return_value)
+                    return "ERROR"
+            except ValueError:
+                return "Enter valid options"
+    elif JENKINS == "True":
+        for ci_name in config_data.keys():
+            j=j+1
+            ci_name_list.append(ci_name)
+
+        selected_ci = config_vars.get('Settings', 'selected_ci')
+        options_int_list = [int(value) for value in selected_ci.split(',')]
 
     for i in options_int_list:
         config_temp_data = {ci_name_list[i-1]: config_data[ci_name_list[i-1]]}
@@ -165,14 +186,17 @@ def main():
     if isinstance(ci_list,dict):
         start_date,end_date = get_date_input()
         if start_date != None and end_date != None:
-            print("Please select one of the option from Job History functionalities: ")
-            print("1. Node Status")
-            print("2. Brief Job information")
-            print("3. Detailed Job information")
-            print("4. Failed testcases")
-            print("5. Get builds with testcase failure")
+            if JENKINS == "False":
+                print("Please select one of the option from Job History functionalities: ")
+                print("1. Node Status")
+                print("2. Brief Job information")
+                print("3. Detailed Job information")
+                print("4. Failed testcases")
+                print("5. Get builds with testcase failure")
 
-            option = input("Enter the option: ")
+                option = input("Enter the option: ")
+            elif JENKINS == "True":
+                option = config_vars.get('Settings','query_option')
 
             print("Checking runs from",end_date,"to",start_date)
     
