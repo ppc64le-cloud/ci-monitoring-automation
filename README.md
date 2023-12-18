@@ -45,13 +45,19 @@ Create a virtualenv if required and install required packages using "pip install
 
 
 
-2. **CI_JobHistory.py:** The CI_JobHistory.py is a interactive script which allows user to query a specific information from all builds that ran on the CI system within a given date range.  
+2. **CI_JobHistory.py:** The CI_JobHistory.py is a script which allows user to query a specific information from all builds that ran on the CI system within a given date range.  
     
     ```python3 CI_JobHistory.py```
 
-    1. The CI_JobHistory.py when invoked with command line argument zone, it will get all builds that ran in the particular zone.
+    1. Interactive Execution: The CI_JobHistory.py can be executed in a interactive mode by setting JEN variable as False in config.ini file.
 
-        ```python3 CI_JobHistory.py --zone syd04```
+    2. Non-Interactive Execution: The CI_JobHistory.py can be executed in a non-interactive mode by setting JEN variable as True in config.ini file, along with the JEN variable user needs to provide values for the following variables:
+        ```
+        selected_ci: CI's from where to fetch the jobs.
+        before_date: End date.
+        after_date: Start date.
+        query_option: Query code to fetch information from builds.
+        ```
 
 
 3. **p_config.json:** The p_config.json file will have ci name and ci links of ppc64le architecture CI in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
