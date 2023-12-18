@@ -64,6 +64,37 @@ def get_jobs(s):
     else:
         return "Failed to get the prowCI response"
     
+def mce_cluster_deploy_status(spy_link):
+    job_type,_ = job_classifier(spy_link)
+    mce_install_log_url = 'https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs' + spy_link[8:] + '/artifacts/' + job_type + '/hypershift-mce-install/finished.json'
+
+    response = requests.get(mce_install_log_url, verify=False, timeout=15)
+    if response.status_code == 200:
+        try:
+            cluster_status = json.loads(response.text)
+            cluster_result = "MCE-INSTALL "+ cluster_status["result"]
+            if cluster_status["result"] == "SUCCESS":
+                # check mce-power-create status also
+                mce_power_log_url = 'https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs' + spy_link[8:] + '/artifacts/' + job_type + '/hypershift-mce-power-create/finished.json'
+
+                response = requests.get(mce_power_log_url, verify=False, timeout=15)
+                if response.status_code == 200:
+                    try:
+                        cluster_status = json.loads(response.text)
+                        cluster_result += "\nMCE-POWER-CREATE "+ cluster_status["result"]
+                        if cluster_status["result"] == "SUCCESS":
+                            cluster_result = "SUCCESS"
+                        return cluster_result
+                    except json.JSONDecodeError as e:
+                        return 'ERROR'
+                else:
+                    return 'ERROR'
+            else:
+                return cluster_result
+        except json.JSONDecodeError as e:
+            return 'ERROR'
+    else:
+        return 'ERROR'
 
 def cluster_deploy_status(spy_link):
     job_type,job_platform = job_classifier(spy_link)
@@ -120,7 +151,7 @@ def cluster_creation_error_analysis(spylink):
 def get_node_status(spy_link):
     '''Function to fetch the node status and determine if all nodes are up and running'''
     job_type,job_platform = job_classifier(spy_link)
-    if job_platform == "powervs":
+    if job_platform == "powervs" or job_platform == "mce":
         job_type += "/gather-extra"
     else:
         job_type += "/gather-libvirt"
@@ -132,9 +163,9 @@ def get_node_status(spy_link):
         response_str=node_log_response.text
         if "NotReady" in response_str:
             return "Some Nodes are in NotReady state"
-        elif response_str.count("master-") != 3:
+        elif response_str.count("control-plane,master") != 3:
             return "Not all master nodes are up and running"
-        elif response_str.count("worker-") != 2:
+        elif (job_platform == "mce" and response_str.count("worker") != 3) or (job_platform != "mce" and response_str.count("worker-") != 2): 
             return "Not all worker nodes are up and running"
     else:
         return "Node details not found"
@@ -222,22 +253,41 @@ def get_quota_and_nightly(spy_link):
         else:
             nightly = "s390x-latest-"+ nightly_log_match.group(2)
         return lease, nightly
+    elif 'mce' in spy_link:
+        build_log_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/build-log.txt"
+        job_platform = "aws" #currently it contains only aws hence hardcoding
+        zone_log_re = re.compile('(Acquired 1 lease\(s\) for {}-quota-slice: \[)([^]]+)(\])'.format(job_platform), re.MULTILINE|re.DOTALL)
+        build_log_response = requests.get(build_log_url, verify=False, timeout=15)
+        zone_log_match = zone_log_re.search(build_log_response.text)
+        if zone_log_match is None:
+            lease = "Failed to fetch lease information"
+        else:
+            lease = zone_log_match.group(2)
+        nightly_log_re = re.compile('(Resolved release multi-latest to (\S+))', re.MULTILINE|re.DOTALL)
+        nightly_log_match = nightly_log_re.search(build_log_response.text)
+        if nightly_log_match is None:
+            nightly = "Failed to fetch nightly image"
+        else:
+            nightly = "multi-latest-"+ nightly_log_match.group(2)
+        return lease, nightly
+
 
 def job_classifier(spy_link):
 
     pattern = r'ocp.*?/'
+    if "mce" in spy_link:
+        pattern = r'e2e.*?/'
     match = re.search(pattern,spy_link)
 
     if match:
         job_type = match.group(0)
         job_type = job_type.rstrip('/')
-
+    job_platform = "mce"
     if spy_link.find("powervs") != -1:
         job_platform = "powervs"
-        return job_type,job_platform
     elif spy_link.find("libvirt") != -1:
         job_platform = "libvirt"
-        return job_type,job_platform
+    return job_type,job_platform
 
 
 def get_failed_monitor_testcases(spy_link,job_type):
@@ -269,9 +319,11 @@ def get_failed_monitor_testcases(spy_link,job_type):
 
 
 def get_failed_e2e_testcases(spy_link,job_type):
-
-    test_log_junit_dir_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/"
-
+    if "mce" in spy_link:
+        test_type = "conformance-tests"
+    else:
+        test_type = "openshift-e2e-libvirt-test"
+    test_log_junit_dir_url = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/" + test_type + "/artifacts/junit/"
     response = requests.get(test_log_junit_dir_url, verify=False, timeout=15)
 
     if response.status_code == 200:
@@ -280,7 +332,7 @@ def get_failed_e2e_testcases(spy_link,job_type):
         
         if test_failure_summary_filename_match is not None:
             test_failure_summary_filename_str = test_failure_summary_filename_match.group(1)
-            test_log_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/" + test_failure_summary_filename_str
+            test_log_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs" + spy_link[8:] + "/artifacts/" + job_type + "/"+ test_type +"/artifacts/junit/" + test_failure_summary_filename_str
             response_2 = requests.get(test_log_url,verify=False, timeout=15)
             if response_2.status_code == 200:
                 try:
@@ -512,14 +564,16 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
         if zone is not None and lease not in zone :
             continue
         e2e_test_result = e2e_monitor_result = False
-        cluster_status=cluster_deploy_status(job)
+        if "mce" in job:
+            cluster_status = mce_cluster_deploy_status(job)
+        else:
+            cluster_status=cluster_deploy_status(job)
         i=i+1
         job_dict = {}
         job_dict["Build"] = prow_ci_name
         job_dict["Prow Job ID"] = job_id
         job_dict["Install Status"] = cluster_status
         job_dict["Lease"]=lease
-        
         if cluster_status == 'SUCCESS' and "4.15" not in prow_ci_link:
             deploy_count += 1
             job_type,_ = job_classifier(job)
@@ -591,13 +645,16 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
         if zone is not None and lease not in zone:
             jobs_to_deleted.append(job)
             continue
-        cluster_status=cluster_deploy_status(job)
         i=i+1
         print(i,".","Job ID: ",job_id)
         print("Job link: https://prow.ci.openshift.org/"+job)
         
         print("Lease Quota-", lease,"\nNightly info-", nightly)
-        check_node_crash(job)
+        if "mce" in job:
+            cluster_status = mce_cluster_deploy_status(job)
+        else:
+            cluster_status=cluster_deploy_status(job)
+            check_node_crash(job)
         node_status = get_node_status(job)
         print(node_status)
 
