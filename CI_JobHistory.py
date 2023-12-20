@@ -181,14 +181,12 @@ def main():
     config_data = monitor.load_config(config_file)
 
     ci_list = display_ci_links(config_data)
-
-
     if isinstance(ci_list,dict):
         start_date,end_date = get_date_input()
         if start_date != None and end_date != None:
             if JENKINS == "False":
                 print("Please select one of the option from Job History functionalities: ")
-                print("1. Node Status")
+                print("1. Check Node Crash")
                 print("2. Brief Job information")
                 print("3. Detailed Job information")
                 print("4. Failed testcases")
@@ -204,6 +202,9 @@ def main():
                 for ci_name,ci_link in ci_list.items():
                     print("-------------------------------------------------------------------------------------------------")
                     print(ci_name)
+                    if "sno" in ci_link or "mce" in ci_link:
+                        print("Node crash check is not supported in SNO/MCE jobs")
+                        continue
                     spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
                     check_for_node_crashes(spy_links,zone=args.zone)
                     monitor.final_job_list = []
@@ -224,6 +225,9 @@ def main():
                 for ci_name,ci_link in ci_list.items():
                     print("-------------------------------------------------------------------------------------------------")
                     print(ci_name)
+                    if "sno" in ci_link:
+                        print("Tests execution is not yet supported in SNO")
+                        continue
                     spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
                     get_failed_testcases(spy_links,zone=args.zone)
                     monitor.final_job_list = []
@@ -235,6 +239,9 @@ def main():
                 for ci_name,ci_link in ci_list.items():
                     print("-------------------------------------------------------------------------------------------------")
                     print(ci_name)
+                    if "sno" in ci_link:
+                        print("Tests execution is not yet supported in SNO")
+                        continue
                     spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
                     for tc in tc_list:
                         print("TESTCASE NAME: " + tc)
