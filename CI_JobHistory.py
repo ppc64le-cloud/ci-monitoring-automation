@@ -80,13 +80,8 @@ def get_failed_testcases(spylinks, zone):
         if cluster_status == 'SUCCESS' and "4.15" not in spylink:
             j=j+1
             print(str(j)+".",job_id)
-            monitor.print_e2e_testcase_failures(spylink,job_type)
+            monitor.print_all_failed_tc(spylink,job_type)
             print("\n")
-        elif cluster_status == 'SUCCESS' and "4.15" in spylink:
-            j=j+1
-            print(str(j)+".",job_id)
-            monitor.print_e2e_testcase_failures(spylink,job_type)
-            monitor.print_monitor_testcase_failures(spylink,job_type)
     print("--------------------------------------------------------------------------------------------------")
     print("\n")
 
