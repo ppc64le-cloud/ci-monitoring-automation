@@ -356,7 +356,13 @@ def get_failed_e2e_testcases(spy_link,job_type):
         return "Failed to get response from e2e-test directory url" 
 
 def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
-    test_log_junit_dir_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/gather-extra/artifacts/junit/junit_symptoms.xml"
+
+    if "power" in spy_link:
+        job_type=job_type+"/gather-extra"
+    elif "libvirt" in spy_link:
+        job_type=job_type+"/gather-libvirt"
+
+    test_log_junit_dir_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/artifacts/junit/junit_symptoms.xml"
     symptom_detection_failed_testcase = []
     response = requests.get(test_log_junit_dir_url,verify=False,timeout=15)
     if response.status_code == 200:
@@ -370,36 +376,61 @@ def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
         return 'Error fetching junit symptom detection test results'
 
 
-def print_e2e_testcase_failures(spylink,jobtype):
-    e2e_result = False
-    e2e_failures = get_failed_e2e_testcases(spylink,jobtype)
-    if isinstance(e2e_failures,list):
-        if not e2e_failures:
-            print("All e2e conformance test cases passed")
-            e2e_result = True
-        else:
-            print("Failed testcases: ")
-            for e in e2e_failures:
-                print(e["Test"]["Name"])
-    elif isinstance(e2e_failures,str):
-        print(e2e_failures)
-    return e2e_result
+def get_all_failed_tc(spylink,jobtype):
 
-def print_monitor_testcase_failures(spylink,jobtype):
-    e2e_result = False
-    monitor_e2e_failures = get_failed_monitor_testcases(spylink,jobtype)
-    if isinstance(monitor_e2e_failures,list):
-        if not monitor_e2e_failures:
-            print("All monitor test cases passed")
-            e2e_result = True
-        else:
-            print("Failed monitor testcases: ")
-            for e in monitor_e2e_failures:
-                print(e["Test"]["Name"])
-    elif isinstance(monitor_e2e_failures,str):
-        print(monitor_e2e_failures)
-    return e2e_result
+    conformance_failed_tc_count=0
+    monitor_failed_tc_count=0
+    symptom_failed_tc_count=0
 
+    conformance_tc_failures = get_failed_e2e_testcases(spylink,jobtype)
+    conformance=[]
+    if isinstance(conformance_tc_failures,list):
+        conformance_failed_tc_count = len(conformance_tc_failures)
+        for tc in conformance_tc_failures:
+            conformance.append(tc["Test"]["Name"])
+    elif isinstance(conformance_tc_failures,str):
+        conformance_failed_tc_count = -5000
+        conformance=[conformance_tc_failures]
+
+    symptom_detection_tc_failures = get_junit_symptom_detection_testcase_failures(spylink,jobtype)
+    symptom_detection=[]
+    if isinstance(symptom_detection_tc_failures,list):
+        symptom_failed_tc_count = len(symptom_detection_tc_failures)
+        for tc in symptom_detection_tc_failures:
+            symptom_detection.append(tc)
+    elif isinstance(symptom_detection_tc_failures,str):
+        symptom_failed_tc_count = -5000
+        symptom_detection=[symptom_detection_tc_failures]
+
+    failed_tc = {"conformance": conformance, "symptom_detection": symptom_detection}
+
+    if "4.15" in spylink:
+        monitor_tc_failures = get_failed_monitor_testcases(spylink,jobtype)
+        monitor=[]
+        if isinstance(monitor_tc_failures,list):
+            monitor_failed_tc_count = len(monitor_tc_failures)
+            for tc in monitor_tc_failures:
+                monitor.append(tc["Test"]["Name"])
+        elif isinstance(monitor_tc_failures,str):
+            monitor_failed_tc_count = -5000
+            monitor=[monitor_tc_failures]
+        failed_tc = {"conformance": conformance, "monitor": monitor, "symptom_detection": symptom_detection}
+    
+    failed_tc_count=conformance_failed_tc_count+symptom_failed_tc_count+monitor_failed_tc_count
+    return failed_tc,failed_tc_count
+
+
+def print_all_failed_tc(spylink,jobtype):
+    tc_failures,failed_tc_count = get_all_failed_tc(spylink,jobtype)
+    for key,value in tc_failures.items():
+        if len(value) !=0:
+            print(key,'testcase failures')
+            for tc in value:
+                print(tc)
+        elif len(value) == 0:
+            print('All',key,'testcases passed')
+    return failed_tc_count
+            
 
 final_job_list=[]
 
@@ -414,24 +445,15 @@ def check_testcase_failure(spylink,job_type,testcase_name):
     Return:
         return True if testcase failed in this particular build else return False.
     """
-    failed_tcs = get_failed_e2e_testcases(spylink,job_type)
-    monitor_tcs = get_failed_monitor_testcases(spylink,job_type)
-    if isinstance(failed_tcs,list):
-        for tc in failed_tcs:
-            if testcase_name in tc['Test']['Name']:
+    failed_tcs,_ = get_all_failed_tc(spylink,job_type)
+    print(failed_tcs)
+    for key,values in failed_tcs.items():
+        for tc in values:
+            if tc == testcase_name:
+                print(testcase_name)
                 return True
-    elif isinstance(failed_tcs,str):
-        if testcase_name in failed_tcs:
-            return True
-
-    if isinstance(monitor_tcs,list):
-        for tc in monitor_tcs:
-            if testcase_name in tc['Test']['Name']:
-                return True
-    elif isinstance(monitor_tcs,str):
-        if testcase_name in monitor_tcs:
-            return True
-    return False
+            else:
+                return False
 
 #fetches all the job spylinks in the given date range
 
@@ -545,7 +567,6 @@ def get_next_page_first_build_date(ci_next_page_spylink,end_date):
 
 def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,zone=None):
     
-
     if start_date is not None and end_date is not None:
         job_list = get_jobs_with_date(prow_ci_link,start_date,end_date)
     else:
@@ -558,8 +579,6 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
     if len(job_list) == 0:
         print ("No job runs on {} ".format(prow_ci_name))
 
-    deploy_count = 0
-    e2e_count = 0
     i=0
 
     pattern_job_id =  r'/(\d+)'
@@ -570,7 +589,6 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
         lease, _ = get_quota_and_nightly(job)
         if zone is not None and lease not in zone :
             continue
-        e2e_test_result = e2e_monitor_result = False
         cluster_status=cluster_deploy_status(job)
         i=i+1
         job_dict = {}
@@ -578,45 +596,15 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
         job_dict["Prow Job ID"] = job_id
         job_dict["Install Status"] = cluster_status
         job_dict["Lease"]=lease
-        if cluster_status == 'SUCCESS' and "4.15" not in prow_ci_link and "sno" not in prow_ci_link:
-            deploy_count += 1
+        if cluster_status == 'SUCCESS' and "sno" not in prow_ci_link:
             job_type,_ = job_classifier(job)
-            e2e_test_result = get_failed_e2e_testcases(job,job_type)
-            if isinstance(e2e_test_result,list):
-                if len(e2e_test_result) == 0:
-                    e2e_count += 1
-                    job_dict["Test result"] = "PASS"   
-                elif len(e2e_test_result) != 0:
-                    job_dict["Test result"] = str(len(e2e_test_result)) + " testcases failed"   
-            elif isinstance(e2e_test_result,str):
-                job_dict["Test result"] = e2e_test_result
-
-        elif cluster_status == 'SUCCESS' and "4.15" in prow_ci_link and "sno" not in prow_ci_link:
-            deploy_count += 1
-            job_type,_ = job_classifier(job)
-            e2e_test_result = get_failed_e2e_testcases(job,job_type)
-            e2e_monitor_result = get_failed_monitor_testcases(job,job_type)
-            if isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,list):        
-                total_e2e_failure = len(e2e_test_result)+len(e2e_monitor_result)
-                if total_e2e_failure != 0:
-                    job_dict["Test result"] = str(total_e2e_failure) + " testcases failed"
-                elif total_e2e_failure == 0:
-                    e2e_count += 1
-                    job_dict["Test result"] = "PASS"
-            elif isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,str): 
-                job_dict["Test result"] = e2e_monitor_result #the error message received while fetching monitor testcase results
-                if len(e2e_test_result) !=0:
-                    job_dict["Test result"] += str(len(e2e_test_result)) + " conformance testcases failed"
-                elif len(e2e_test_result) == 0:
-                    job_dict["Test result"] += "PASS"
-            elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,list):
-                job_dict["Test result"] = e2e_test_result #the error message received while fetching conformance testcase results
-                if len(e2e_monitor_result) !=0:
-                    job_dict["Test result"] += str(len(e2e_monitor_result)) + " monitor testcases failed"
-                elif len(e2e_monitor_result) == 0:
-                    job_dict["Test result"] += "PASS"
-            elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,str):
-                job_dict["Test result"] = e2e_test_result + " " + e2e_monitor_result
+            _, e2e_test_result = get_all_failed_tc(job,job_type)
+            if e2e_test_result == 0:
+                job_dict["Test result"] = "PASS"   
+            elif e2e_test_result > 0:
+                job_dict["Test result"] = str(e2e_test_result) + " testcases failed"   
+            elif e2e_test_result < 0:
+                job_dict["Test result"] = "Failed to get Test summary"
         summary_list.append(job_dict)
     return summary_list
 
@@ -644,7 +632,6 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
     for job in job_list:
         match = re.search(pattern_job_id, job)
         job_id = match.group(1)
-        e2e_test_result = e2e_monitor_result = False
         lease, nightly = get_quota_and_nightly(job)
         if zone is not None and lease not in zone:
             jobs_to_deleted.append(job)
@@ -660,53 +647,13 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
             print(node_status)
         check_node_crash(job)
 
-        if cluster_status == 'SUCCESS' and "4.15" not in prow_ci_link:
+        if cluster_status == 'SUCCESS':
             deploy_count += 1
             if "sno" not in prow_ci_link:
                 job_type,_ = job_classifier(job)
-                e2e_test_result = get_failed_e2e_testcases(job,job_type)
-                if isinstance(e2e_test_result,list):
-                    if len(e2e_test_result) == 0:
-                        e2e_count += 1
-                        print("All e2e testcases passed")
-                    elif len(e2e_test_result) != 0:
-                        print_e2e_testcase_failures(job,job_type)
-                        print(len(e2e_test_result),"testcases failed")
-                elif isinstance(e2e_test_result,str):
-                    print(e2e_test_result)
-
-        elif cluster_status == 'SUCCESS' and "4.15" in prow_ci_link and "sno" not in prow_ci_link:
-            deploy_count += 1
-            if "sno" not in prow_ci_link:
-                job_type,_ = job_classifier(job)
-                e2e_test_result = get_failed_e2e_testcases(job,job_type)
-                e2e_monitor_result = get_failed_monitor_testcases(job,job_type)
-                if isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,list):        
-                    total_e2e_failure = len(e2e_test_result)+len(e2e_monitor_result)
-                    if total_e2e_failure != 0:
-                        print_e2e_testcase_failures(job,job_type)
-                        print_monitor_testcase_failures(job,job_type)
-                        print(total_e2e_failure,"testcases failed")
-                    elif total_e2e_failure == 0:
-                        e2e_count += 1
-                        print("All e2e testcases passed")
-                elif isinstance(e2e_test_result,list) and isinstance(e2e_monitor_result,str):
-                    print(e2e_monitor_result) #prints the error message recived while fetching monitor testcase results
-                    if len(e2e_test_result) !=0:
-                        print_e2e_testcase_failures(job,job_type)
-                        print(len(e2e_test_result), "conformance testcases failed")
-                    elif len(e2e_test_result) == 0:
-                        print("All conformance e2e testcases passed")
-                elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,list):
-                    print(e2e_test_result) #prints the error message recived while fetching conformance testcase results
-                    if len(e2e_monitor_result) !=0:
-                        print_monitor_testcase_failures(job,job_type)
-                        print(len(e2e_monitor_result), "monitor testcases failed")
-                    elif len(e2e_monitor_result) == 0:
-                        print("All monitor e2e testcases passed")
-                elif isinstance(e2e_test_result,str) and isinstance(e2e_monitor_result,str):
-                    print(e2e_test_result)
-                    print(e2e_monitor_result)
+                failed_tc_count=print_all_failed_tc(job,job_type)
+                if failed_tc_count==0:
+                    e2e_count=e2e_count+1
 
         elif cluster_status == 'FAILURE':
                 print("Cluster Creation Failed")
