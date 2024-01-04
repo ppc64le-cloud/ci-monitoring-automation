@@ -19,6 +19,14 @@ JENKINS = config_vars.get('Settings', 'JENKINS')
 
 def get_date_input():
 
+    '''
+    Gets start and end date input.
+
+    Returns:
+        Date: Start date
+        Date: End date
+    '''
+
     if JENKINS == "False":
         date_str_1 = input("Enter Before date (YYYY-MM-DD): ") #example  2023-11-14
         date_str_2 = input("Enter After date (YYYY-MM-DD): ")  #example  2023-11-13
@@ -114,6 +122,17 @@ def get_testcase_failure(spylinks, zone, tc_name):
     print("\n")
 
 def display_ci_links(config_data):
+
+    '''
+    Gets selected CI input.
+
+    Parameter:
+        config_data (dict): Dictionary of all the CI's mentioned in the config file
+
+    Returns:
+        List(int): Serial number of selected CI's 
+    '''
+
     j=0
 
     ci_name_list = []

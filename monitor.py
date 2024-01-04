@@ -11,6 +11,17 @@ PROW_URL = "https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/"
 PROW_VIEW_URL = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs"
 
 def load_config(config_file):
+
+    '''
+    Loads data from a config file.
+
+    Parameter:
+        config_file(string): Config file name.
+
+    Returns:
+        dict: Data from config file converted to dict data type.
+    '''
+
     with open(config_file,'r') as config_file:
         config = json.load(config_file)
     return config 
@@ -19,6 +30,17 @@ def get_current_date():
     return datetime.now().date()
 
 def parse_job_date(date):
+
+    '''
+    Converts string to Date datatype.
+
+    Parameter:
+        date: string.
+
+    Returns:
+        Date
+    '''
+    
     parse_date=datetime.strptime(date,"%Y-%m-%dT%H:%M:%SZ")
     job_run_date=parse_date.date()
     return job_run_date
@@ -26,6 +48,16 @@ def parse_job_date(date):
 
 def get_jobs(prow_link):
     
+    '''
+    Gets SpyglassLink of all the jobs which have run on the current day on a CI.
+
+    Parameter:
+        prow_link (string):  keyword used to generate CI link
+
+    Returns:
+        list(strings): SpyglassLinks of jobs
+    '''
+
     url = PROW_URL + prow_link
 
     response = requests.get(url, verify=False, timeout=15)
@@ -67,6 +99,17 @@ def get_jobs(prow_link):
         return "Failed to get the prowCI response"
 
 def cluster_deploy_status(spy_link):
+
+    '''
+    Gets the status of cluster deployment step of a job.
+
+    Parameter:
+        spy_link (string):  SpyglassLink used to generate url to access logs of a job.
+
+    Returns:
+        string: Cluster Deployment Status 
+    '''
+
     job_type,job_platform = job_classifier(spy_link)
     if "mce" in spy_link:
         mce_install_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/hypershift-mce-install/finished.json'
@@ -113,6 +156,14 @@ def cluster_deploy_status(spy_link):
             return 'ERROR'
     
 def cluster_creation_error_analysis(spylink):
+
+    '''
+    Prints the reason for cluster deployment failure step of a job.
+
+    Parameter:
+        spylink (string):  SpyglassLink used to generate url to access logs of a job.
+    '''
+
     job_type,job_platform = job_classifier(spylink)
     job_log_url = PROW_VIEW_URL + spylink[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/build-log.txt'
     
@@ -151,7 +202,17 @@ def cluster_creation_error_analysis(spylink):
         print("Error while fetching cluster installation logs")
 
 def get_node_status(spy_link):
-    '''Function to fetch the node status and determine if all nodes are up and running'''
+
+    '''
+    Gets the node status of the job.
+
+    Parameter:
+        spy_link (string):  SpyglassLink used to generate url to access logs of a job.
+
+    Returns:
+        string: Node Status.
+    '''
+    
     job_type,job_platform = job_classifier(spy_link)
     if job_platform == "powervs" or job_platform == "mce":
         job_type += "/gather-extra"
@@ -174,6 +235,14 @@ def get_node_status(spy_link):
     return "All nodes are in Ready state"
 
 def check_node_crash(spy_link):
+
+    '''
+    Checks and prints if any node crash has occured in the cluster.
+
+    Parameter:
+        spy_link (string):  SpyglassLink used to generate url to access logs of a job.
+    '''
+
     if "mce" not in spy_link and "sno" not in spy_link:
         job_type,_ = job_classifier(spy_link)
         crash_log_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" +job_type + "/ipi-conf-debug-kdump-gather-logs/artifacts/"
@@ -186,6 +255,18 @@ def check_node_crash(spy_link):
             print("No crash observed")
         
 def get_quota_and_nightly(spy_link):
+
+    '''
+    Gets lease/region where cluster is deployed and the nightly image used.
+
+    Parameter:
+        spy_link (string):  SpyglassLink used to generate url to access logs of a job.
+
+    Returns:
+        lease(string): Acquired lease/region.
+        nightly(string): Nighlty image used.
+    '''
+
     _,job_platform = job_classifier(spy_link)
     lease = ""
 
@@ -279,6 +360,17 @@ def get_quota_and_nightly(spy_link):
 
 def job_classifier(spy_link):
 
+    '''
+    Extracts the job type and platform information from SpyglassLink.
+
+    Parameter:
+        spy_link (string):  SpyglassLink used to filter the job_type and job_platform.
+
+    Returns:
+        job_type(string): It is a important keyword used while constructing url to access the artifacts.
+        job_platform(string): The infrastructure where the cluster is deployed (ex: libvirt, powervs etc).
+    '''
+
     pattern = r'ocp.*?/'
     if "mce" in spy_link:
         pattern = r'e2e.*?/'
@@ -298,6 +390,18 @@ def job_classifier(spy_link):
 
 
 def get_failed_monitor_testcases(spy_link,job_type):
+
+    '''
+    Gets failed monitor testcases.
+
+    Parameter:
+        spy_link (string):  SpyglassLink used to generate url to access logs of a job.
+        job_type (string):  Keyword used to construct url to access the logs of a job.
+
+    Returns:
+        list(strings): List of failed monitor testcases.
+    '''
+
     test_log_junit_dir_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/"
 
     response = requests.get(test_log_junit_dir_url, verify=False, timeout=15)
@@ -326,6 +430,18 @@ def get_failed_monitor_testcases(spy_link,job_type):
 
 
 def get_failed_e2e_testcases(spy_link,job_type):
+
+    '''
+    Gets failed testcases from conformance testsuite.
+
+    Parameter:
+        spy_link (string):  SpyglassLink used to generate url to access logs of a job.
+        job_type (string):  Keyword used to construct url to access logs of a job.
+
+    Returns:
+        list(string): List of failed conformance testcases.
+    '''
+
     if "mce" in spy_link:
         test_type = "conformance-tests"
     else:
@@ -357,6 +473,17 @@ def get_failed_e2e_testcases(spy_link,job_type):
 
 def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
 
+    '''
+    Gets failed symptom detection testcases.
+
+    Parameter:
+        spy_link (string):  SpyglassLink used to generate url to access logs of a job.
+        job_type (string):  Keyword used to construct url to access logs of a job.
+
+    Returns:
+        list(string): List of failed symptom detection testcases.
+    '''
+
     if "power" in spy_link:
         job_type=job_type+"/gather-extra"
     elif "libvirt" in spy_link:
@@ -377,6 +504,18 @@ def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
 
 
 def get_all_failed_tc(spylink,jobtype):
+
+    '''
+    Gets all failed testcases from diffrent test suites and store in a single variable.
+
+    Parameter:
+        spylink (string):  SpyglassLink used to generate url to access logs of a job.
+        jobtype (string):  Keyword used to construct url to access logs of a job.
+
+    Returns:
+        dict: Dictionary of failed all failed testcases.
+        int: Count of total failed testcases
+    '''
 
     conformance_failed_tc_count=0
     monitor_failed_tc_count=0
@@ -421,6 +560,18 @@ def get_all_failed_tc(spylink,jobtype):
 
 
 def print_all_failed_tc(spylink,jobtype):
+
+    '''
+    Prints all the  failed testcases.
+
+    Parameter:
+        spylink (string):  SpyglassLink used to generate url to access logs of a job.
+        jobtype (string):  Keyword used to construct url to access logs of a job.
+
+    Returns:
+        int: Count of total failed testcases
+    '''
+
     tc_failures,failed_tc_count = get_all_failed_tc(spylink,jobtype)
     for key,value in tc_failures.items():
         if len(value) !=0:
@@ -440,7 +591,7 @@ def check_testcase_failure(spylink,job_type,testcase_name):
 
     Args:
         spylink (string): Build which needs to be checked.
-        job_type (string): Job type (libvirt or powervs)
+        job_type (string): Keyword used to construct url to access the artifacts.
         testcase_name (string): Name of the testcase.
     Return:
         return True if testcase failed in this particular build else return False.
@@ -458,6 +609,18 @@ def check_testcase_failure(spylink,job_type,testcase_name):
 #fetches all the job spylinks in the given date range
 
 def get_jobs_with_date(prowci_url,start_date,end_date):
+
+    """
+    Gets all the jobs/builds run in the given date range.
+
+    Args:
+        prowci_url (string): CI url used to fetch the jobs.
+        start_date (string): Before date(Future)
+        end_date (string): After date(Past)
+    Return:
+        List(string): List of spylinks of the jobs.
+    """
+
 
     url = PROW_URL + prowci_url
 
@@ -527,6 +690,16 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
  
 def get_next_page_first_build_date(ci_next_page_spylink,end_date):
 
+    """
+    Checks if the date of first build run in the next page of CI is older than end_date.
+
+    Args:
+        ci_next_page_spylink (string): CI url used to fetch the jobs.
+        end_date (string): After Date.
+    Return:
+        Boolean: Returns True if end_date is older than first build date else returns False.
+    """
+
     ci_next_page_link = PROW_URL + ci_next_page_spylink
 
     response = requests.get(ci_next_page_link, verify=False, timeout=15)
@@ -566,6 +739,19 @@ def get_next_page_first_build_date(ci_next_page_spylink,end_date):
         return 'ERROR'
 
 def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,zone=None):
+
+    """
+    Gets brief information of all the jobs.
+
+    Args:
+        prow_ci_name: CI name
+        prow_ci_link (string): CI url used to fetch the jobs
+        start_date (string, optional): Before date(Future)
+        end_date (string, optional): After date(Past)
+        zone(string, optional): Cluster deployment zone
+    Return:
+        List(string): List of jobs with the brief information.
+    """    
     
     if start_date is not None and end_date is not None:
         job_list = get_jobs_with_date(prow_ci_link,start_date,end_date)
@@ -609,6 +795,17 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
     return summary_list
 
 def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,zone=None):
+
+    """
+    Prints detailed information of all the jobs.
+
+    Args:
+        prow_ci_name: CI name
+        prow_ci_link (string): CI url used to fetch the jobs
+        start_date (string, optional): Start date(Future)
+        end_date (string, optional): End date(Past)
+        zone(string, optional): Cluster deployment zone
+    """    
 
     if start_date is not None and end_date is not None:
         job_list = get_jobs_with_date(prow_ci_link,start_date,end_date)
