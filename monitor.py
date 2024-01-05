@@ -428,6 +428,44 @@ def get_failed_monitor_testcases(spy_link,job_type):
     else:
         return "Failed to get response from e2e-test directory url"
 
+def get_testcase_frequency(spylinks, zone, tc_name = None):
+    """
+    To get the testcases failing with its frequency
+
+    Args:
+        spylinks (list): list of builds which needs to be checked.
+        zone (list): List of the zones/leases that need to checked.
+        tc_name (list): list of testcase name.
+
+    Returns:
+        dict: Dict with testcase as key and its frequency as value
+
+    """
+    frequency = {}
+    for spylink in spylinks:
+        job_type,_ = job_classifier(spylink)
+        lease,_ = get_quota_and_nightly(spylink)
+        if zone is not None and lease not in zone :
+            continue
+        cluster_status=cluster_deploy_status(spylink)
+        if cluster_status == 'SUCCESS':
+            tc_failures,_ = get_all_failed_tc(spylink,job_type)
+            for _,value in tc_failures.items():
+                if len(value) !=0:
+                    for tc in value:
+                        if tc in frequency:
+                            frequency[tc]+= 1
+                        else:
+                            frequency[tc] = 1
+    sorted_frequency = dict(sorted(frequency.items(),key = lambda item: item[1], reverse=True))
+    frequency = {}
+    if tc_name is not None:
+        for tc in tc_name:
+            if tc in sorted_frequency:
+                frequency[tc] = sorted_frequency[tc]
+        return frequency
+
+    return sorted_frequency
 
 def get_failed_e2e_testcases(spy_link,job_type):
 
