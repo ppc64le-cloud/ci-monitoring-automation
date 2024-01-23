@@ -493,12 +493,15 @@ def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
     symptom_detection_failed_testcase = []
     response = requests.get(test_log_junit_dir_url,verify=False,timeout=15)
     if response.status_code == 200:
-        root = ET.fromstring(response.content)
-        for testcase in root.findall('.//testcase'):
-            testcase_name = testcase.get('name')
-            if testcase.find('failure') is not None:
-                symptom_detection_failed_testcase.append(testcase_name)
-        return symptom_detection_failed_testcase
+        try:
+            root = ET.fromstring(response.content)
+            for testcase in root.findall('.//testcase'):
+                testcase_name = testcase.get('name')
+                if testcase.find('failure') is not None:
+                    symptom_detection_failed_testcase.append(testcase_name)
+            return symptom_detection_failed_testcase
+        except ET.ParseError as e:
+            return "Failed to parse junit e2e log file!"
     else:
         return 'Error fetching junit symptom detection test results'
 
@@ -868,4 +871,3 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
         print("--------------------------------------------------------------------------------------------------")
     else:
         print ("No job runs on {} ".format(prow_ci_name))
-    
