@@ -85,13 +85,30 @@ def get_failed_testcases(spylinks, zone):
         if zone is not None and lease not in zone :
             continue
         cluster_status=monitor.cluster_deploy_status(spylink)
-        if cluster_status == 'SUCCESS' and "4.15" not in spylink:
+        if cluster_status == 'SUCCESS':
             j=j+1
             print(str(j)+".",job_id)
             monitor.print_all_failed_tc(spylink,job_type)
             print("\n")
     print("--------------------------------------------------------------------------------------------------")
     print("\n")
+
+def print_tc_frequency(spylinks, zone, tc_name = None):
+    """
+    To display the testcases failing with its frequency
+
+    Args:
+        spylinks (list): list of builds which needs to be checked.
+        zone (list): List of the zones/leases that need to checked.
+        tc_name (list): list of testcase name.
+
+    """
+
+    frequency = monitor.get_testcase_frequency(spylinks,zone,tc_name)
+    table_data = [(key,value) for key, value in frequency.items()]
+    print(tabulate(table_data, headers = ['Testcase','Frequency'], tablefmt='grid'))
+print("--------------------------------------------------------------------------------------------------")
+print("\n")
 
 def get_testcase_failure(spylinks, zone, tc_name):
     """
@@ -205,6 +222,7 @@ def main():
                 print("3. Detailed Job information")
                 print("4. Failed testcases")
                 print("5. Get builds with testcase failure")
+                print("6. Get testcase failure frequency")
 
                 option = input("Enter the option: ")
             elif JENKINS == "True":
@@ -260,6 +278,22 @@ def main():
                     for tc in tc_list:
                         print("TESTCASE NAME: " + tc)
                         get_testcase_failure(spy_links,zone=args.zone,tc_name=tc)
+                    monitor.final_job_list = []
+
+            if option == '6':
+                  tc_name = input("Enter the testcase names comma seperated (Leave it empty to fetch all tcs frequency): ")
+                  tc_list = None 
+                  if bool(tc_name):
+                      tc_list =  tc_name.split(",") 
+                    
+                  for ci_name,ci_link in ci_list.items():
+                    print("-------------------------------------------------------------------------------------------------")
+                    print(ci_name)
+                    if "sno" in ci_link:
+                        print("Tests execution is not yet supported in SNO")
+                        continue
+                    spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
+                    print_tc_frequency(spy_links,zone=args.zone,tc_name=tc_list)
                     monitor.final_job_list = []
 
 if __name__ == "__main__":
