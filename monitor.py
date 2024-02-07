@@ -60,43 +60,47 @@ def get_jobs(prow_link):
 
     url = PROW_URL + prow_link
 
-    response = requests.get(url, verify=False, timeout=15)
+    try:
+        response = requests.get(url, verify=False, timeout=15)
     
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.text, 'html.parser')
-        script_elements = soup.find_all('script')
-        selected_script_element = None
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            script_elements = soup.find_all('script')
+            selected_script_element = None
 
-        for script_element in script_elements:
-            script_content = script_element.string
-            if script_content:
-                if 'allBuilds' in script_content:
-                    selected_script_element = script_content
-                    break
+            for script_element in script_elements:
+                script_content = script_element.string
+                if script_content:
+                    if 'allBuilds' in script_content:
+                        selected_script_element = script_content
+                        break
         
-        if selected_script_element:
-            var_name = 'allBuilds'
-            pattern = rf'{var_name}\s*=\s*(.*?);'
+            if selected_script_element:
+                var_name = 'allBuilds'
+                pattern = rf'{var_name}\s*=\s*(.*?);'
 
-            match = re.search(pattern, selected_script_element)
-            if match:
-                all_jobs=match.group(1)
-                #print(all_jobs)
-                try:
-                    all_jobs_parsed=json.loads(all_jobs)
-                    current_date=get_current_date()
-                    jobs_run_today = []
-                    for ele in all_jobs_parsed:
-                        job_time=parse_job_date(ele["Started"])
-                        if job_time == current_date and ele["Result"] != "PENDING":
-                            job_log_path = ele["SpyglassLink"]
-                            jobs_run_today.append(job_log_path)
-                    return jobs_run_today
-                except json.JSONDecodeError as e:
-                    return "Failed to extract the spy-links from spylink please check the UI!"
-                    
-    else:
-        return "Failed to get the prowCI response"
+                match = re.search(pattern, selected_script_element)
+                if match:
+                    all_jobs=match.group(1)
+                    #print(all_jobs)
+                    try:
+                        all_jobs_parsed=json.loads(all_jobs)
+                        current_date=get_current_date()
+                        jobs_run_today = []
+                        for ele in all_jobs_parsed:
+                            job_time=parse_job_date(ele["Started"])
+                            if job_time == current_date and ele["Result"] != "PENDING":
+                                job_log_path = ele["SpyglassLink"]
+                                jobs_run_today.append(job_log_path)
+                        return jobs_run_today
+                    except json.JSONDecodeError as e:
+                        return "Failed to extract the spy-links from spylink please check the UI!"                    
+        else:
+            return "Failed to get the prowCI response"
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
 
 def cluster_deploy_status(spy_link):
 
@@ -114,46 +118,56 @@ def cluster_deploy_status(spy_link):
     if "mce" in spy_link:
         mce_install_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/hypershift-mce-install/finished.json'
 
-        response = requests.get(mce_install_log_url, verify=False, timeout=15)
-        if response.status_code == 200:
-            try:
-                cluster_status = json.loads(response.text)
-                cluster_result = "MCE-INSTALL "+ cluster_status["result"]
-                if cluster_status["result"] == "SUCCESS":
-                    # check mce-power-create status also
-                    mce_power_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/hypershift-mce-power-create/finished.json'
+        try:
+            response = requests.get(mce_install_log_url, verify=False, timeout=15)
+            if response.status_code == 200:
+                try:
+                    cluster_status = json.loads(response.text)
+                    cluster_result = "MCE-INSTALL "+ cluster_status["result"]
+                    if cluster_status["result"] == "SUCCESS":
+                        # check mce-power-create status also
+                        mce_power_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/hypershift-mce-power-create/finished.json'
 
-                    response = requests.get(mce_power_log_url, verify=False, timeout=15)
-                    if response.status_code == 200:
-                        try:
-                            cluster_status = json.loads(response.text)
-                            cluster_result += "\nMCE-POWER-CREATE "+ cluster_status["result"]
-                            if cluster_status["result"] == "SUCCESS":
-                                cluster_result = "SUCCESS"
-                            return cluster_result
-                        except json.JSONDecodeError as e:
+                        response = requests.get(mce_power_log_url, verify=False, timeout=15)
+                        if response.status_code == 200:
+                            try:
+                                cluster_status = json.loads(response.text)
+                                cluster_result += "\nMCE-POWER-CREATE "+ cluster_status["result"]
+                                if cluster_status["result"] == "SUCCESS":
+                                    cluster_result = "SUCCESS"
+                                return cluster_result
+                            except json.JSONDecodeError as e:
+                                return 'ERROR'
+                        else:
                             return 'ERROR'
                     else:
-                        return 'ERROR'
-                else:
-                    return cluster_result
-            except json.JSONDecodeError as e:
+                        return cluster_result
+                except json.JSONDecodeError as e:
+                    return 'ERROR'
+            else:
                 return 'ERROR'
-        else:
-            return 'ERROR'
+        except requests.Timeout:
+            return "Request timed out"
+        except requests.RequestException:
+            return "Error while sending request to url"
     else:
         job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/finished.json'
         if "sno" in spy_link:
             job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/upi-install-powervs-sno/finished.json'
-        response = requests.get(job_log_url, verify=False, timeout=15)
-        if response.status_code == 200:
-            try:
-                cluster_status = json.loads(response.text)
-                return cluster_status["result"]
-            except json.JSONDecodeError as e:
+        try:
+            response = requests.get(job_log_url, verify=False, timeout=15)
+            if response.status_code == 200:
+                try:
+                    cluster_status = json.loads(response.text)
+                    return cluster_status["result"]
+                except json.JSONDecodeError as e:
+                    return 'ERROR'
+            else:
                 return 'ERROR'
-        else:
-            return 'ERROR'
+        except requests.Timeout:
+            return "Request timed out"
+        except requests.RequestException:
+            return "Error while sending request to url"
     
 def cluster_creation_error_analysis(spylink):
 
@@ -167,39 +181,44 @@ def cluster_creation_error_analysis(spylink):
     job_type,job_platform = job_classifier(spylink)
     job_log_url = PROW_VIEW_URL + spylink[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/build-log.txt'
     
-    response = requests.get(job_log_url,verify=False)
+    try:
+        response = requests.get(job_log_url,verify=False)
 
-    if response.status_code == 200:
+        if response.status_code == 200:
 
-        installation_log = response.text
-        if job_platform == "powervs":
-            failed_line_index = installation_log.find("FAILED")
-            cluster_failure_log = installation_log[failed_line_index:].splitlines()
-            for line in cluster_failure_log[1:7]:
-                print(line)
-                    
-        elif job_platform == "libvirt":
-            failed_line_index_1 = installation_log.find("level-error")
-            
-            if failed_line_index_1 == -1:
-                failed_line_index_2 = installation_log.find("level=fatal")
-                if failed_line_index_2 == -1:
-                    failed_line_number_3 = installation_log.find("error:")
-                    cluster_failure_log = installation_log[failed_line_number_3:].splitlines()
-
-                    for line in cluster_failure_log[:7]:
-                        print(line)
-                else:
-                    cluster_failure_log = installation_log[failed_line_index_2:].splitlines()
-
-                    for line in cluster_failure_log[:7]:
-                        print(line)
-            else:
-                cluster_failure_log = installation_log[failed_line_index_1:].splitlines()
+            installation_log = response.text
+            if job_platform == "powervs":
+                failed_line_index = installation_log.find("FAILED")
+                cluster_failure_log = installation_log[failed_line_index:].splitlines()
                 for line in cluster_failure_log[1:7]:
                     print(line)
-    else:
-        print("Error while fetching cluster installation logs")
+                    
+            elif job_platform == "libvirt":
+                failed_line_index_1 = installation_log.find("level-error")
+            
+                if failed_line_index_1 == -1:
+                    failed_line_index_2 = installation_log.find("level=fatal")
+                    if failed_line_index_2 == -1:
+                        failed_line_number_3 = installation_log.find("error:")
+                        cluster_failure_log = installation_log[failed_line_number_3:].splitlines()
+
+                        for line in cluster_failure_log[:7]:
+                            print(line)
+                    else:
+                        cluster_failure_log = installation_log[failed_line_index_2:].splitlines()
+
+                        for line in cluster_failure_log[:7]:
+                            print(line)
+                else:
+                    cluster_failure_log = installation_log[failed_line_index_1:].splitlines()
+                    for line in cluster_failure_log[1:7]:
+                        print(line)
+        else:
+            print("Error while fetching cluster installation logs")
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
 
 def get_node_status(spy_link):
 
@@ -221,18 +240,24 @@ def get_node_status(spy_link):
     
     node_log_url = PROW_VIEW_URL + spy_link[8:] + \
         "/artifacts/" + job_type +"/artifacts/oc_cmds/nodes"
-    node_log_response = requests.get(node_log_url, verify=False, timeout=15)
-    if "NAME" in node_log_response.text:
-        response_str=node_log_response.text
-        if "NotReady" in response_str:
-            return "Some Nodes are in NotReady state"
-        elif response_str.count("control-plane,master") != 3:
-            return "Not all master nodes are up and running"
-        elif (job_platform == "mce" and response_str.count("worker") != 3) or (job_platform != "mce" and response_str.count("worker-") != 2): 
-            return "Not all worker nodes are up and running"
-    else:
-        return "Node details not found"
-    return "All nodes are in Ready state"
+    
+    try:
+        node_log_response = requests.get(node_log_url, verify=False, timeout=15)
+        if "NAME" in node_log_response.text:
+            response_str=node_log_response.text
+            if "NotReady" in response_str:
+                return "Some Nodes are in NotReady state"
+            elif response_str.count("control-plane,master") != 3:
+                return "Not all master nodes are up and running"
+            elif (job_platform == "mce" and response_str.count("worker") != 3) or (job_platform != "mce" and response_str.count("worker-") != 2): 
+                return "Not all worker nodes are up and running"
+        else:
+            return "Node details not found"
+        return "All nodes are in Ready state"
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
 
 def check_node_crash(spy_link):
 
@@ -246,14 +271,20 @@ def check_node_crash(spy_link):
     if "mce" not in spy_link and "sno" not in spy_link:
         job_type,_ = job_classifier(spy_link)
         crash_log_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" +job_type + "/ipi-conf-debug-kdump-gather-logs/artifacts/"
-        crash_log_response = requests.get(crash_log_url, verify=False, timeout=15)
-        if "kdump.tar" in crash_log_response.text:
-            print("*********************************")
-            print ("ERROR- Crash observed in the job")
-            print("*********************************")
-        else:
-            print("No crash observed")
         
+        try:
+            crash_log_response = requests.get(crash_log_url, verify=False, timeout=15)
+            if "kdump.tar" in crash_log_response.text:
+                print("*********************************")
+                print ("ERROR- Crash observed in the job")
+                print("*********************************")
+            else:
+                print("No crash observed")
+        except requests.Timeout:
+            return "Request timed out"
+        except requests.RequestException:
+            return "Error while sending request to url"
+
 def get_quota_and_nightly(spy_link):
 
     '''
@@ -278,40 +309,45 @@ def get_quota_and_nightly(spy_link):
             job_platform+="-[1-9]"
 
         zone_log_re = re.compile('(Acquired 1 lease\(s\) for {}-quota-slice: \[)([^]]+)(\])'.format(job_platform), re.MULTILINE|re.DOTALL)
-        build_log_response = requests.get(build_log_url, verify=False, timeout=15)
-        zone_log_match = zone_log_re.search(build_log_response.text)
-        if zone_log_match is None:
-            lease = "Failed to fetch lease information"
-        else:
-            lease = zone_log_match.group(2)
+        try:
+            build_log_response = requests.get(build_log_url, verify=False, timeout=15)
+            zone_log_match = zone_log_re.search(build_log_response.text)
+            if zone_log_match is None:
+                lease = "Failed to fetch lease information"
+            else:
+                lease = zone_log_match.group(2)
     # Fetch the nightly information for non-upgrade jobs
-        if "upgrade" not in build_log_url:
-            nightly_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
-            nightly_log_match = nightly_log_re.search(build_log_response.text)
-            if nightly_log_match is None:
-                rc_nightly_log_re = re.compile('(Using explicitly provided pull-spec for release ppc64le-latest \((\S+)\))', re.MULTILINE|re.DOTALL)
-                rc_nightly_log_match = rc_nightly_log_re.search(build_log_response.text)
-                if rc_nightly_log_match is None:
-                    nightly = "Unable to fetch nightly information- No match found"
+            if "upgrade" not in build_log_url:
+                nightly_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
+                nightly_log_match = nightly_log_re.search(build_log_response.text)
+                if nightly_log_match is None:
+                    rc_nightly_log_re = re.compile('(Using explicitly provided pull-spec for release ppc64le-latest \((\S+)\))', re.MULTILINE|re.DOTALL)
+                    rc_nightly_log_match = rc_nightly_log_re.search(build_log_response.text)
+                    if rc_nightly_log_match is None:
+                        nightly = "Unable to fetch nightly information- No match found"
+                    else:
+                        nightly = rc_nightly_log_match.group(2)
                 else:
-                    nightly = rc_nightly_log_match.group(2)
-            else:
-                nightly = "ppc64le-latest-"+ nightly_log_match.group(2)
+                    nightly = "ppc64le-latest-"+ nightly_log_match.group(2)
     # Fetch nightly information for upgrade jobs- fetch both ppc64le-initial and ppc64le-latest
-        else:
-            nightly_initial_log_re = re.compile('(Resolved release ppc64le-initial to (\S+))', re.MULTILINE|re.DOTALL)
-            nightly_initial_log_match = nightly_initial_log_re.search(build_log_response.text)
-            if nightly_initial_log_match is None:
-                nightly = "Unable to fetch nightly ppc64le-initial information- No match found"
             else:
-                nightly = "ppc64le-initial-"+ nightly_initial_log_match.group(2)
-            nightly_latest_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
-            nightly_latest_log_match = nightly_latest_log_re.search(build_log_response.text)
-            if nightly_latest_log_match is None:
-                nightly = nightly + " Unable to fetch nightly ppc64le-latest information- No match found"
-            else:
-                nightly = nightly + " ppc64le-latest-"+ nightly_latest_log_match.group(2)
-        return lease, nightly
+                nightly_initial_log_re = re.compile('(Resolved release ppc64le-initial to (\S+))', re.MULTILINE|re.DOTALL)
+                nightly_initial_log_match = nightly_initial_log_re.search(build_log_response.text)
+                if nightly_initial_log_match is None:
+                    nightly = "Unable to fetch nightly ppc64le-initial information- No match found"
+                else:
+                    nightly = "ppc64le-initial-"+ nightly_initial_log_match.group(2)
+                nightly_latest_log_re = re.compile('(Resolved release ppc64le-latest to (\S+))', re.MULTILINE|re.DOTALL)
+                nightly_latest_log_match = nightly_latest_log_re.search(build_log_response.text)
+                if nightly_latest_log_match is None:
+                    nightly = nightly + " Unable to fetch nightly ppc64le-latest information- No match found"
+                else:
+                    nightly = nightly + " ppc64le-latest-"+ nightly_latest_log_match.group(2)
+            return lease, nightly
+        except requests.Timeout:
+            return "Request timed out"
+        except requests.RequestException:
+            return "Error while sending request to url"
     
     elif 's390x' in spy_link:
         build_log_url = PROW_VIEW_URL + spy_link[8:] + "/build-log.txt"
@@ -319,43 +355,53 @@ def get_quota_and_nightly(spy_link):
             job_platform+="-s390x"
 
         zone_log_re = re.compile('(Acquired 1 lease\(s\) for {}-quota-slice: \[)([^]]+)(\])'.format(job_platform), re.MULTILINE|re.DOTALL)
-        build_log_response = requests.get(build_log_url, verify=False, timeout=15)
-        zone_log_match = zone_log_re.search(build_log_response.text)
-        if zone_log_match is None:
-            lease = "Failed to fetch lease information"
-        else:
-            lease = zone_log_match.group(2)
-        nightly_log_re = re.compile('(Resolved release s390x-latest to (\S+))', re.MULTILINE|re.DOTALL)
-        nightly_log_match = nightly_log_re.search(build_log_response.text)
-        if nightly_log_match is None:
-            rc_nightly_log_re = re.compile('(Using explicitly provided pull-spec for release s390x-latest \((\S+)\))', re.MULTILINE|re.DOTALL)
-            rc_nightly_log_match = rc_nightly_log_re.search(build_log_response.text)
-            if rc_nightly_log_match is None:
-                nightly = "Unable to fetch nightly information- No match found"
-            else:
-                nightly = rc_nightly_log_match.group(2)
-        else:
-            nightly = "s390x-latest-"+ nightly_log_match.group(2)
-        return lease, nightly
-    else:     
-        build_log_url = PROW_VIEW_URL + spy_link[8:] + "/build-log.txt"
-        build_log_response = requests.get(build_log_url, verify=False, timeout=15)
-        # lease is not applicable for SNO hence checking only for MCE
-        if "mce" in spy_link:
-            job_platform = "aws" #currently it contains only aws hence hardcoding
-            zone_log_re = re.compile('(Acquired 1 lease\(s\) for {}-quota-slice: \[)([^]]+)(\])'.format(job_platform), re.MULTILINE|re.DOTALL)
+        try:
+            build_log_response = requests.get(build_log_url, verify=False, timeout=15)
             zone_log_match = zone_log_re.search(build_log_response.text)
             if zone_log_match is None:
                 lease = "Failed to fetch lease information"
             else:
                 lease = zone_log_match.group(2)
-        nightly_log_re = re.compile('(Resolved release multi-latest to (\S+))', re.MULTILINE|re.DOTALL)
-        nightly_log_match = nightly_log_re.search(build_log_response.text)
-        if nightly_log_match is None:
-            nightly = "Failed to fetch nightly image"
-        else:
-            nightly = "multi-latest-"+ nightly_log_match.group(2)
-        return lease, nightly
+            nightly_log_re = re.compile('(Resolved release s390x-latest to (\S+))', re.MULTILINE|re.DOTALL)
+            nightly_log_match = nightly_log_re.search(build_log_response.text)
+            if nightly_log_match is None:
+                rc_nightly_log_re = re.compile('(Using explicitly provided pull-spec for release s390x-latest \((\S+)\))', re.MULTILINE|re.DOTALL)
+                rc_nightly_log_match = rc_nightly_log_re.search(build_log_response.text)
+                if rc_nightly_log_match is None:
+                    nightly = "Unable to fetch nightly information- No match found"
+                else:
+                    nightly = rc_nightly_log_match.group(2)
+            else:
+                nightly = "s390x-latest-"+ nightly_log_match.group(2)
+            return lease, nightly
+        except requests.Timeout:
+            return "Request timed out"
+        except requests.RequestException:
+            return "Error while sending request to url"
+    else:     
+        build_log_url = PROW_VIEW_URL + spy_link[8:] + "/build-log.txt"
+        try:
+            build_log_response = requests.get(build_log_url, verify=False, timeout=15)
+            # lease is not applicable for SNO hence checking only for MCE
+            if "mce" in spy_link:
+                job_platform = "aws" #currently it contains only aws hence hardcoding
+                zone_log_re = re.compile('(Acquired 1 lease\(s\) for {}-quota-slice: \[)([^]]+)(\])'.format(job_platform), re.MULTILINE|re.DOTALL)
+                zone_log_match = zone_log_re.search(build_log_response.text)
+                if zone_log_match is None:
+                    lease = "Failed to fetch lease information"
+                else:
+                    lease = zone_log_match.group(2)
+            nightly_log_re = re.compile('(Resolved release multi-latest to (\S+))', re.MULTILINE|re.DOTALL)
+            nightly_log_match = nightly_log_re.search(build_log_response.text)
+            if nightly_log_match is None:
+                nightly = "Failed to fetch nightly image"
+            else:
+                nightly = "multi-latest-"+ nightly_log_match.group(2)
+            return lease, nightly
+        except requests.Timeout:
+            return "Request timed out"
+        except requests.RequestException:
+            return "Error while sending request to url"
 
 
 def job_classifier(spy_link):
@@ -404,29 +450,34 @@ def get_failed_monitor_testcases(spy_link,job_type):
 
     test_log_junit_dir_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/"
 
-    response = requests.get(test_log_junit_dir_url, verify=False, timeout=15)
+    try:
+        response = requests.get(test_log_junit_dir_url, verify=False, timeout=15)
 
-    if response.status_code == 200:
-        monitor_test_failure_summary_filename_re = re.compile('(test-failures-summary_monitor_2[^.]*\.json)')
-        monitor_test_failure_summary_filename_match = monitor_test_failure_summary_filename_re.search(response.text, re.MULTILINE|re.DOTALL)
+        if response.status_code == 200:
+            monitor_test_failure_summary_filename_re = re.compile('(test-failures-summary_monitor_2[^.]*\.json)')
+            monitor_test_failure_summary_filename_match = monitor_test_failure_summary_filename_re.search(response.text, re.MULTILINE|re.DOTALL)
         
-        if monitor_test_failure_summary_filename_match is not None:
-            monitor_test_failure_summary_filename_str = monitor_test_failure_summary_filename_match.group(1)
-            test_log_url=PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/" + monitor_test_failure_summary_filename_str
-            response_2 = requests.get(test_log_url,verify=False, timeout=15)
-            if response_2.status_code == 200:
-                try:
-                    data = response_2.json()
-                    e2e_failure_list = data['Tests']
-                    return e2e_failure_list
-                except json.JSONDecodeError as e:
-                    return "Failed to parse the data from e2e-test log file!"
+            if monitor_test_failure_summary_filename_match is not None:
+                monitor_test_failure_summary_filename_str = monitor_test_failure_summary_filename_match.group(1)
+                test_log_url=PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/" + monitor_test_failure_summary_filename_str
+                response_2 = requests.get(test_log_url,verify=False, timeout=15)
+                if response_2.status_code == 200:
+                    try:
+                        data = response_2.json()
+                        e2e_failure_list = data['Tests']
+                        return e2e_failure_list
+                    except json.JSONDecodeError as e:
+                        return "Failed to parse the data from e2e-test log file!"
+                else:
+                    return "Failed to get response from e2e-test log file url!"
             else:
-                return "Failed to get response from e2e-test log file url!"
+                return "Test summary file not found"
         else:
-            return "Test summary file not found"
-    else:
-        return "Failed to get response from e2e-test directory url"
+            return "Failed to get response from e2e-test directory url"
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
 
 def get_testcase_frequency(spylinks, zone, tc_name = None):
     """
@@ -485,29 +536,34 @@ def get_failed_e2e_testcases(spy_link,job_type):
     else:
         test_type = "openshift-e2e-libvirt-test"
     test_log_junit_dir_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/" + test_type + "/artifacts/junit/"
-    response = requests.get(test_log_junit_dir_url, verify=False, timeout=15)
+    try:
+        response = requests.get(test_log_junit_dir_url, verify=False, timeout=15)
 
-    if response.status_code == 200:
-        test_failure_summary_filename_re = re.compile('(test-failures-summary_2[^.]*\.json)')
-        test_failure_summary_filename_match = test_failure_summary_filename_re.search(response.text, re.MULTILINE|re.DOTALL)
+        if response.status_code == 200:
+            test_failure_summary_filename_re = re.compile('(test-failures-summary_2[^.]*\.json)')
+            test_failure_summary_filename_match = test_failure_summary_filename_re.search(response.text, re.MULTILINE|re.DOTALL)
         
-        if test_failure_summary_filename_match is not None:
-            test_failure_summary_filename_str = test_failure_summary_filename_match.group(1)
-            test_log_url=PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/"+ test_type +"/artifacts/junit/" + test_failure_summary_filename_str
-            response_2 = requests.get(test_log_url,verify=False, timeout=15)
-            if response_2.status_code == 200:
-                try:
-                    data = response_2.json()
-                    e2e_failure_list = data['Tests']
-                    return e2e_failure_list
-                except json.JSONDecodeError as e:
-                    return "Failed to parse the data from e2e-test log file!"
+            if test_failure_summary_filename_match is not None:
+                test_failure_summary_filename_str = test_failure_summary_filename_match.group(1)
+                test_log_url=PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/"+ test_type +"/artifacts/junit/" + test_failure_summary_filename_str
+                response_2 = requests.get(test_log_url,verify=False, timeout=15)
+                if response_2.status_code == 200:
+                    try:
+                        data = response_2.json()
+                        e2e_failure_list = data['Tests']
+                        return e2e_failure_list
+                    except json.JSONDecodeError as e:
+                        return "Failed to parse the data from e2e-test log file!"
+                else:
+                    return "Failed to get response from e2e-test log file url!"
             else:
-                return "Failed to get response from e2e-test log file url!"
+                return "Test summary file not found"
         else:
-            return "Test summary file not found"
-    else:
-        return "Failed to get response from e2e-test directory url" 
+            return "Failed to get response from e2e-test directory url" 
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
 
 def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
 
@@ -529,19 +585,24 @@ def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
 
     test_log_junit_dir_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/artifacts/junit/junit_symptoms.xml"
     symptom_detection_failed_testcase = []
-    response = requests.get(test_log_junit_dir_url,verify=False,timeout=15)
-    if response.status_code == 200:
-        try:
-            root = ET.fromstring(response.content)
-            for testcase in root.findall('.//testcase'):
-                testcase_name = testcase.get('name')
-                if testcase.find('failure') is not None:
-                    symptom_detection_failed_testcase.append(testcase_name)
-            return symptom_detection_failed_testcase
-        except ET.ParseError as e:
-            return "Failed to parse junit e2e log file!"
-    else:
-        return 'Error fetching junit symptom detection test results'
+    try:
+        response = requests.get(test_log_junit_dir_url,verify=False,timeout=15)
+        if response.status_code == 200:
+            try:
+                root = ET.fromstring(response.content)
+                for testcase in root.findall('.//testcase'):
+                    testcase_name = testcase.get('name')
+                    if testcase.find('failure') is not None:
+                        symptom_detection_failed_testcase.append(testcase_name)
+                return symptom_detection_failed_testcase
+            except ET.ParseError as e:
+                return "Failed to parse junit e2e log file!"
+        else:
+            return 'Error fetching junit symptom detection test results'
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
 
 
 def get_all_failed_tc(spylink,jobtype):
@@ -665,67 +726,70 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
 
     url = PROW_URL + prowci_url
 
-    
-    response = requests.get(url, verify=False, timeout=15)
+    try:
+        response = requests.get(url, verify=False, timeout=15)
 
 
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.text, 'html.parser')
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
 
-        td_element = soup.find_all('td')
-        td_element2 = str(td_element)
-        next_link_pattern = r'/job[^>"]*'
-        next_link_match = re.search(next_link_pattern,td_element2)
-        if next_link_match != None:
-            next_link = next_link_match.group()
+            td_element = soup.find_all('td')
+            td_element2 = str(td_element)
+            next_link_pattern = r'/job[^>"]*'
+            next_link_match = re.search(next_link_pattern,td_element2)
+            if next_link_match != None:
+                next_link = next_link_match.group()
 
-        script_elements = soup.find_all('script')
-        selected_script_element = None
+            script_elements = soup.find_all('script')
+            selected_script_element = None
 
-        # print(script_elements) prints the list of scripts elements
+            # print(script_elements) prints the list of scripts elements
 
-        for script_element in script_elements:
-            script_content = script_element.string
-            if script_content:
-                if 'allBuilds' in script_content:
-                    selected_script_element = script_content
-                    break
+            for script_element in script_elements:
+                script_content = script_element.string
+                if script_content:
+                    if 'allBuilds' in script_content:
+                        selected_script_element = script_content
+                        break
         
         # print(type(selected_script_element)) ##prints script element with a var name
 
-        if selected_script_element:
-            var_name = 'allBuilds'
-            pattern = rf'{var_name}\s*=\s*(.*?);'
+            if selected_script_element:
+                var_name = 'allBuilds'
+                pattern = rf'{var_name}\s*=\s*(.*?);'
 
-            match = re.search(pattern, selected_script_element)
+                match = re.search(pattern, selected_script_element)
             
-            if match:
-                all_jobs=match.group(1)
-                try:
-                    all_jobs_parsed=json.loads(all_jobs)
-                    for ele in all_jobs_parsed:
-                        job_time=parse_job_date(ele["Started"])
+                if match:
+                    all_jobs=match.group(1)
+                    try:
+                        all_jobs_parsed=json.loads(all_jobs)
+                        for ele in all_jobs_parsed:
+                            job_time=parse_job_date(ele["Started"])
                         
-                        if end_date <= job_time <= start_date and ele["Result"] != "PENDING" :
-                            job_log_path = ele["SpyglassLink"]
-                            final_job_list.append(job_log_path)
+                            if end_date <= job_time <= start_date and ele["Result"] != "PENDING" :
+                                job_log_path = ele["SpyglassLink"]
+                                final_job_list.append(job_log_path)
 
-                    if next_link_match != None:
-                        next_page_spylink=next_link[35:]
-                        check=get_next_page_first_build_date(next_page_spylink,end_date)
+                        if next_link_match != None:
+                            next_page_spylink=next_link[35:]
+                            check=get_next_page_first_build_date(next_page_spylink,end_date)
                     
-                        if check == True:
-                            get_jobs_with_date(next_page_spylink,start_date,end_date)
-                        elif check == 'ERROR':
-                            print("Error while fetching the job-links please check the UI")
-                    return final_job_list
-                except json.JSONDecodeError as e:
-                    print("Failed to extract data from the script tag")
-                    return "ERROR"
-    else:
-        print("Failed to get response from the prowCI link")
-        return 'ERROR'
-
+                            if check == True:
+                                get_jobs_with_date(next_page_spylink,start_date,end_date)
+                            elif check == 'ERROR':
+                                print("Error while fetching the job-links please check the UI")
+                        return final_job_list
+                    except json.JSONDecodeError as e:
+                        print("Failed to extract data from the script tag")
+                        return "ERROR"
+        else:
+            print("Failed to get response from the prowCI link")
+            return 'ERROR'
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
 
 #Checks if the jobs next page are in the given date range
  
@@ -743,42 +807,47 @@ def get_next_page_first_build_date(ci_next_page_spylink,end_date):
 
     ci_next_page_link = PROW_URL + ci_next_page_spylink
 
-    response = requests.get(ci_next_page_link, verify=False, timeout=15)
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.text, 'html.parser')
-        script_elements = soup.find_all('script')
-        selected_script_element = None
+    try:
+        response = requests.get(ci_next_page_link, verify=False, timeout=15)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            script_elements = soup.find_all('script')
+            selected_script_element = None
 
-        for script_element in script_elements:
-            script_content = script_element.string
-            if script_content:
-                if 'allBuilds' in script_content:
-                    selected_script_element = script_content
-                    break
+            for script_element in script_elements:
+                script_content = script_element.string
+                if script_content:
+                    if 'allBuilds' in script_content:
+                        selected_script_element = script_content
+                        break
         
-        if selected_script_element:
-            var_name = 'allBuilds'
-            pattern = rf'{var_name}\s*=\s*(.*?);'
+            if selected_script_element:
+                var_name = 'allBuilds'
+                pattern = rf'{var_name}\s*=\s*(.*?);'
 
-            match = re.search(pattern, selected_script_element)
-            if match:
-                all_jobs=match.group(1)
+                match = re.search(pattern, selected_script_element)
+                if match:
+                    all_jobs=match.group(1)
                 
-                try:
-                    all_jobs_parsed=json.loads(all_jobs)
-                    job_date=all_jobs_parsed[0]["Started"]
-                    parsed_job_date = parse_job_date(job_date)
-                    if end_date <= parsed_job_date:
-                        return True
-                    elif end_date > parsed_job_date:
-                        return False
-                except json.JSONDecodeError as e:
-                    print("Failed to extract the spy-links from spylink please check the UI!")
-                    return "ERROR"
-    else:
-        print("Failed to get the prowCI response")
-        return 'ERROR'
-
+                    try:
+                        all_jobs_parsed=json.loads(all_jobs)
+                        job_date=all_jobs_parsed[0]["Started"]
+                        parsed_job_date = parse_job_date(job_date)
+                        if end_date <= parsed_job_date:
+                            return True
+                        elif end_date > parsed_job_date:
+                            return False
+                    except json.JSONDecodeError as e:
+                        print("Failed to extract the spy-links from spylink please check the UI!")
+                        return "ERROR"
+        else:
+            print("Failed to get the prowCI response")
+            return 'ERROR'
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
+    
 def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,zone=None):
 
     """
