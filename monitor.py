@@ -1,5 +1,6 @@
 import json
 import re
+import sys
 from bs4 import BeautifulSoup
 import urllib3
 import requests
@@ -9,6 +10,7 @@ import xml.etree.ElementTree as ET
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 PROW_URL = "https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/"
 PROW_VIEW_URL = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs"
+
 
 def load_config(config_file):
 
@@ -21,10 +23,13 @@ def load_config(config_file):
     Returns:
         dict: Data from config file converted to dict data type.
     '''
-
-    with open(config_file,'r') as config_file:
-        config = json.load(config_file)
-    return config 
+    try:
+        with open(config_file,'r') as config_file:
+            config = json.load(config_file)
+        return config
+    except(OSError, json.JSONDecodeError) as e:
+        print(f"Error while reading the config file: {e}")
+        sys.exit(1)
 
 def get_current_date():
     return datetime.now().date()
@@ -82,25 +87,23 @@ def get_jobs(prow_link):
                 match = re.search(pattern, selected_script_element)
                 if match:
                     all_jobs=match.group(1)
-                    #print(all_jobs)
-                    try:
-                        all_jobs_parsed=json.loads(all_jobs)
-                        current_date=get_current_date()
-                        jobs_run_today = []
-                        for ele in all_jobs_parsed:
-                            job_time=parse_job_date(ele["Started"])
-                            if job_time == current_date and ele["Result"] != "PENDING":
-                                job_log_path = ele["SpyglassLink"]
-                                jobs_run_today.append(job_log_path)
-                        return jobs_run_today
-                    except json.JSONDecodeError as e:
-                        return "Failed to extract the spy-links from spylink please check the UI!"                    
+                    all_jobs_parsed=json.loads(all_jobs)
+                    current_date=get_current_date()
+                    jobs_run_today = []
+                    for ele in all_jobs_parsed:
+                        job_time=parse_job_date(ele["Started"])
+                        if job_time == current_date and ele["Result"] != "PENDING":
+                            job_log_path = ele["SpyglassLink"]
+                            jobs_run_today.append(job_log_path)
+                    return jobs_run_today                    
         else:
             return "Failed to get the prowCI response"
-    except requests.Timeout:
+    except requests.Timeout as e:
         return "Request timed out"
-    except requests.RequestException:
+    except requests.RequestException as e:
         return "Error while sending request to url"
+    except json.JSONDecodeError as e:
+        return "Failed to extract the spy-links"
 
 def cluster_deploy_status(spy_link):
 
@@ -121,35 +124,31 @@ def cluster_deploy_status(spy_link):
         try:
             response = requests.get(mce_install_log_url, verify=False, timeout=15)
             if response.status_code == 200:
-                try:
-                    cluster_status = json.loads(response.text)
-                    cluster_result = "MCE-INSTALL "+ cluster_status["result"]
-                    if cluster_status["result"] == "SUCCESS":
+                
+                cluster_status = json.loads(response.text)
+                cluster_result = "MCE-INSTALL "+ cluster_status["result"]
+                if cluster_status["result"] == "SUCCESS":
                         # check mce-power-create status also
-                        mce_power_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/hypershift-mce-power-create/finished.json'
+                    mce_power_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/hypershift-mce-power-create/finished.json'
 
-                        response = requests.get(mce_power_log_url, verify=False, timeout=15)
-                        if response.status_code == 200:
-                            try:
-                                cluster_status = json.loads(response.text)
-                                cluster_result += "\nMCE-POWER-CREATE "+ cluster_status["result"]
-                                if cluster_status["result"] == "SUCCESS":
-                                    cluster_result = "SUCCESS"
-                                return cluster_result
-                            except json.JSONDecodeError as e:
-                                return 'ERROR'
-                        else:
-                            return 'ERROR'
-                    else:
+                    response = requests.get(mce_power_log_url, verify=False, timeout=15)
+                    if response.status_code == 200:
+            
+                        cluster_status = json.loads(response.text)
+                        cluster_result += "\nMCE-POWER-CREATE "+ cluster_status["result"]
+                        if cluster_status["result"] == "SUCCESS":
+                            cluster_result = "SUCCESS"
                         return cluster_result
-                except json.JSONDecodeError as e:
-                    return 'ERROR'
+                else:
+                    return cluster_result
             else:
                 return 'ERROR'
         except requests.Timeout:
             return "Request timed out"
         except requests.RequestException:
             return "Error while sending request to url"
+        except json.JSONDecodeError as e:
+            return 'ERROR'
     else:
         job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/finished.json'
         if "sno" in spy_link:
@@ -157,17 +156,17 @@ def cluster_deploy_status(spy_link):
         try:
             response = requests.get(job_log_url, verify=False, timeout=15)
             if response.status_code == 200:
-                try:
-                    cluster_status = json.loads(response.text)
-                    return cluster_status["result"]
-                except json.JSONDecodeError as e:
-                    return 'ERROR'
+                
+                cluster_status = json.loads(response.text)
+                return cluster_status["result"]
             else:
                 return 'ERROR'
         except requests.Timeout:
             return "Request timed out"
         except requests.RequestException:
             return "Error while sending request to url"
+        except json.JSONDecodeError as e:
+            return 'ERROR'
     
 def cluster_creation_error_analysis(spylink):
 
@@ -462,12 +461,9 @@ def get_failed_monitor_testcases(spy_link,job_type):
                 test_log_url=PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/" + monitor_test_failure_summary_filename_str
                 response_2 = requests.get(test_log_url,verify=False, timeout=15)
                 if response_2.status_code == 200:
-                    try:
-                        data = response_2.json()
-                        e2e_failure_list = data['Tests']
-                        return e2e_failure_list
-                    except json.JSONDecodeError as e:
-                        return "Failed to parse the data from e2e-test log file!"
+                    data = response_2.json()
+                    e2e_failure_list = data['Tests']
+                    return e2e_failure_list
                 else:
                     return "Failed to get response from e2e-test log file url!"
             else:
@@ -478,6 +474,8 @@ def get_failed_monitor_testcases(spy_link,job_type):
         return "Request timed out"
     except requests.RequestException:
         return "Error while sending request to url"
+    except json.JSONDecodeError as e:
+        return "Failed to parse the data from e2e-test log file!"
 
 def get_testcase_frequency(spylinks, zone, tc_name = None):
     """
@@ -548,12 +546,9 @@ def get_failed_e2e_testcases(spy_link,job_type):
                 test_log_url=PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/"+ test_type +"/artifacts/junit/" + test_failure_summary_filename_str
                 response_2 = requests.get(test_log_url,verify=False, timeout=15)
                 if response_2.status_code == 200:
-                    try:
-                        data = response_2.json()
-                        e2e_failure_list = data['Tests']
-                        return e2e_failure_list
-                    except json.JSONDecodeError as e:
-                        return "Failed to parse the data from e2e-test log file!"
+                    data = response_2.json()
+                    e2e_failure_list = data['Tests']
+                    return e2e_failure_list
                 else:
                     return "Failed to get response from e2e-test log file url!"
             else:
@@ -564,6 +559,8 @@ def get_failed_e2e_testcases(spy_link,job_type):
         return "Request timed out"
     except requests.RequestException:
         return "Error while sending request to url"
+    except json.JSONDecodeError as e:
+        return "Failed to parse the data from e2e-test log file!"
 
 def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
 
@@ -588,21 +585,20 @@ def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
     try:
         response = requests.get(test_log_junit_dir_url,verify=False,timeout=15)
         if response.status_code == 200:
-            try:
-                root = ET.fromstring(response.content)
-                for testcase in root.findall('.//testcase'):
-                    testcase_name = testcase.get('name')
-                    if testcase.find('failure') is not None:
-                        symptom_detection_failed_testcase.append(testcase_name)
-                return symptom_detection_failed_testcase
-            except ET.ParseError as e:
-                return "Failed to parse junit e2e log file!"
+            root = ET.fromstring(response.content)
+            for testcase in root.findall('.//testcase'):
+                testcase_name = testcase.get('name')
+                if testcase.find('failure') is not None:
+                    symptom_detection_failed_testcase.append(testcase_name)
+            return symptom_detection_failed_testcase
         else:
             return 'Error fetching junit symptom detection test results'
     except requests.Timeout:
         return "Request timed out"
     except requests.RequestException:
         return "Error while sending request to url"
+    except ET.ParseError as e:
+        return "Failed to parse junit e2e log file!"
 
 
 def get_all_failed_tc(spylink,jobtype):
@@ -708,7 +704,6 @@ def check_testcase_failure(spylink,job_type,testcase_name):
             else:
                 return False
 
-#fetches all the job spylinks in the given date range
 
 def get_jobs_with_date(prowci_url,start_date,end_date):
 
@@ -743,7 +738,6 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
             script_elements = soup.find_all('script')
             selected_script_element = None
 
-            # print(script_elements) prints the list of scripts elements
 
             for script_element in script_elements:
                 script_content = script_element.string
@@ -752,7 +746,6 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
                         selected_script_element = script_content
                         break
         
-        # print(type(selected_script_element)) ##prints script element with a var name
 
             if selected_script_element:
                 var_name = 'allBuilds'
@@ -762,27 +755,23 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
             
                 if match:
                     all_jobs=match.group(1)
-                    try:
-                        all_jobs_parsed=json.loads(all_jobs)
-                        for ele in all_jobs_parsed:
-                            job_time=parse_job_date(ele["Started"])
+                    all_jobs_parsed=json.loads(all_jobs)
+                    for ele in all_jobs_parsed:
+                        job_time=parse_job_date(ele["Started"])
                         
-                            if end_date <= job_time <= start_date and ele["Result"] != "PENDING" :
-                                job_log_path = ele["SpyglassLink"]
-                                final_job_list.append(job_log_path)
+                        if end_date <= job_time <= start_date and ele["Result"] != "PENDING" :
+                            job_log_path = ele["SpyglassLink"]
+                            final_job_list.append(job_log_path)
 
-                        if next_link_match != None:
-                            next_page_spylink=next_link[35:]
-                            check=get_next_page_first_build_date(next_page_spylink,end_date)
+                    if next_link_match != None:
+                        next_page_spylink=next_link[35:]
+                        check=get_next_page_first_build_date(next_page_spylink,end_date)
                     
-                            if check == True:
-                                get_jobs_with_date(next_page_spylink,start_date,end_date)
-                            elif check == 'ERROR':
-                                print("Error while fetching the job-links please check the UI")
-                        return final_job_list
-                    except json.JSONDecodeError as e:
-                        print("Failed to extract data from the script tag")
-                        return "ERROR"
+                        if check == True:
+                            get_jobs_with_date(next_page_spylink,start_date,end_date)
+                        elif check == 'ERROR':
+                            print("Error while fetching the job-links please check the UI")
+                    return final_job_list
         else:
             print("Failed to get response from the prowCI link")
             return 'ERROR'
@@ -790,8 +779,10 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
         return "Request timed out"
     except requests.RequestException:
         return "Error while sending request to url"
+    except json.JSONDecodeError as e:
+        print("Failed to extract data from the script tag")
+        return "ERROR"
 
-#Checks if the jobs next page are in the given date range
  
 def get_next_page_first_build_date(ci_next_page_spylink,end_date):
 
@@ -828,18 +819,14 @@ def get_next_page_first_build_date(ci_next_page_spylink,end_date):
                 match = re.search(pattern, selected_script_element)
                 if match:
                     all_jobs=match.group(1)
-                
-                    try:
-                        all_jobs_parsed=json.loads(all_jobs)
-                        job_date=all_jobs_parsed[0]["Started"]
-                        parsed_job_date = parse_job_date(job_date)
-                        if end_date <= parsed_job_date:
-                            return True
-                        elif end_date > parsed_job_date:
-                            return False
-                    except json.JSONDecodeError as e:
-                        print("Failed to extract the spy-links from spylink please check the UI!")
-                        return "ERROR"
+                    all_jobs_parsed=json.loads(all_jobs)
+                    job_date=all_jobs_parsed[0]["Started"]
+                    parsed_job_date = parse_job_date(job_date)
+                    if end_date <= parsed_job_date:
+                        return True
+                    elif end_date > parsed_job_date:
+                        return False
+                    
         else:
             print("Failed to get the prowCI response")
             return 'ERROR'
@@ -847,6 +834,9 @@ def get_next_page_first_build_date(ci_next_page_spylink,end_date):
         return "Request timed out"
     except requests.RequestException:
         return "Error while sending request to url"
+    except json.JSONDecodeError as e:
+        print("Failed to extract the spy-links from spylink please check the UI!")
+        return "ERROR"
     
 def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,zone=None):
 
