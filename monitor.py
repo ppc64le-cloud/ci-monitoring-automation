@@ -628,8 +628,10 @@ def get_all_failed_tc(spylink,jobtype):
 
     symptom_detection_tc_failures = get_junit_symptom_detection_testcase_failures(spylink,jobtype)
     symptom_detection=[]
-    symptom_detection = symptom_detection_tc_failures
-    if isinstance(symptom_detection_tc_failures,str):
+    if isinstance(symptom_detection_tc_failures,list):
+        symptom_failed_tc_count = len(symptom_detection_tc_failures)
+        symptom_detection = symptom_detection_tc_failures
+    elif isinstance(symptom_detection_tc_failures,str):    
         symptom_failed_tc_count = -5000
         symptom_detection=[symptom_detection_tc_failures]
 
@@ -649,8 +651,10 @@ def get_all_failed_tc(spylink,jobtype):
     elif "4.14" in spylink or "mce" in spylink:
         monitor=[]
         monitor_tc_failures = get_failed_monitor_testcases_from_xml(spylink,jobtype)
-        monitor=monitor_tc_failures
-        if isinstance(monitor_tc_failures,str):
+        if isinstance(monitor_tc_failures,list):
+            monitor_failed_tc_count = len(monitor_tc_failures)
+            monitor=monitor_tc_failures
+        elif isinstance(monitor_tc_failures,str):
             monitor_failed_tc_count = -5000
             monitor=[monitor_tc_failures]
         failed_tc = {"conformance": conformance, "monitor": monitor, "symptom_detection": symptom_detection}
