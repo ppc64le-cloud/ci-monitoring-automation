@@ -685,8 +685,10 @@ def get_all_failed_tc(spylink,jobtype):
 
     symptom_detection_tc_failures = get_junit_symptom_detection_testcase_failures(spylink,jobtype)
     symptom_detection=[]
-    symptom_detection = symptom_detection_tc_failures
-    if isinstance(symptom_detection_tc_failures,str):
+    if isinstance(symptom_detection_tc_failures,list):
+        symptom_failed_tc_count = len(symptom_detection_tc_failures)
+        symptom_detection = symptom_detection_tc_failures
+    elif isinstance(symptom_detection_tc_failures,str):    
         symptom_failed_tc_count = -5000
         symptom_detection=[symptom_detection_tc_failures]
 
@@ -706,8 +708,10 @@ def get_all_failed_tc(spylink,jobtype):
     elif "4.14" in spylink or "mce" in spylink:
         monitor=[]
         monitor_tc_failures = get_failed_monitor_testcases_from_xml(spylink,jobtype)
-        monitor=monitor_tc_failures
-        if isinstance(monitor_tc_failures,str):
+        if isinstance(monitor_tc_failures,list):
+            monitor_failed_tc_count = len(monitor_tc_failures)
+            monitor=monitor_tc_failures
+        elif isinstance(monitor_tc_failures,str):
             monitor_failed_tc_count = -5000
             monitor=[monitor_tc_failures]
         failed_tc = {"conformance": conformance, "monitor": monitor, "symptom_detection": symptom_detection}
@@ -754,14 +758,11 @@ def check_testcase_failure(spylink,job_type,testcase_name):
         return True if testcase failed in this particular build else return False.
     """
     failed_tcs,_ = get_all_failed_tc(spylink,job_type)
-    print(failed_tcs)
-    for key,values in failed_tcs.items():
-        for tc in values:
-            if tc == testcase_name:
-                print(testcase_name)
-                return True
-            else:
-                return False
+
+    for _,values in failed_tcs.items():
+        if testcase_name in values:
+            return True
+    return False
 
 
 def get_jobs_with_date(prowci_url,start_date,end_date):
