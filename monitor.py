@@ -701,14 +701,11 @@ def check_testcase_failure(spylink,job_type,testcase_name):
         return True if testcase failed in this particular build else return False.
     """
     failed_tcs,_ = get_all_failed_tc(spylink,job_type)
-    print(failed_tcs)
-    for key,values in failed_tcs.items():
-        for tc in values:
-            if tc == testcase_name:
-                print(testcase_name)
-                return True
-            else:
-                return False
+
+    for _,values in failed_tcs.items():
+        if testcase_name in values:
+            return True
+    return False
 
 #fetches all the job spylinks in the given date range
 
