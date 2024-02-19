@@ -1,4 +1,3 @@
-import json
 from bs4 import BeautifulSoup
 import urllib3
 from tabulate import tabulate
@@ -12,7 +11,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def main():
     parser = argparse.ArgumentParser(description='Get the daily buid updates')
-    parser.add_argument('--info_type', default='brief', help='specify the job info type')
+    parser.add_argument('--info_type', default='brief', choices=['brief','detailed'], help='specify the job info type (brief or detailed)')
     parser.add_argument('--zone', help='specify the lease/zone', type= lambda arg:arg.split(','))
     parser.add_argument('--ci_arch', default='p', choices=['p','z'], help='Specify the CI architecture type (p or z), default is p')
     args = parser.parse_args()
