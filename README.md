@@ -23,6 +23,14 @@ cd ci-monitoring-automation
 Create a virtualenv if required and install required packages using "pip install -r requirements.txt"
 ```
 
+### Config files
+
+1. **p_config.json:** The p_config.json file will have ci name and ci links of ppc64le architecture CI in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
+
+
+2. **z_config.json:** The p_config.json file will have ci name and ci links of s390x architecture CI in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
+ 
+
 ### Usage
 
 1. **CI_DailyBuildUpdate.py:** The CI_DailyBuildUpdates.py script will fetch and display information of the all builds that ran on the CI system for the current day.  
@@ -49,9 +57,9 @@ Create a virtualenv if required and install required packages using "pip install
     
     ```python3 CI_JobHistory.py```
 
-    1. Interactive Execution: The CI_JobHistory.py can be executed in a interactive mode by setting JEN variable as False in config.ini file.
+    1. Interactive Execution: The CI_JobHistory.py can be executed in a interactive mode by setting JENKINS variable as False in config.ini file.
 
-    2. Non-Interactive Execution: The CI_JobHistory.py can be executed in a non-interactive mode by setting JEN variable as True in config.ini file, along with the JEN variable user needs to provide values for the following variables:
+    2. Non-Interactive Execution: The CI_JobHistory.py can be executed in a non-interactive mode by setting JENKINS variable as True in config.ini file, along with the JENKINS variable user needs to provide values for the following variables:
         ```
         selected_ci: CI's from where to fetch the jobs.
         before_date: End date.
@@ -60,7 +68,10 @@ Create a virtualenv if required and install required packages using "pip install
         ```
 
 
-3. **p_config.json:** The p_config.json file will have ci name and ci links of ppc64le architecture CI in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
+3. **tracker.py:** The tracker.py script helps user to get the testcases failing at a high frequency in the latest run CI builds. This script accepts the following command line arguments:
 
+    ```python3 tracker.py --builds 10 --frequency 3```
 
-4. **z_config.json:** The p_config.json file will have ci name and ci links of s390x architecture CI in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
+    1. builds: This arguments accepts int value, which will query for failed testcases in "n" latest build run in the CI, default value set is 10.
+    2. frequency: This arguments accepts int value, which specifies the frequency threshold and report the testcases which are failing above the frequency, default value set is 3.
+

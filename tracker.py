@@ -32,16 +32,16 @@ def get_tc_frequency(tc_list,frequency):
 def main():
     parser = argparse.ArgumentParser(description='Get the daily buid updates')
     parser.add_argument('--ci_arch', default='p', choices=['p','z'], help='Specify the CI architecture type (p or z), default is p')
-    parser.add_argument('--latest_build', type=int, default=10, help='Value in range of 3 to 20')
-    parser.add_argument('--frequency', type=int, default=3, help='Value in range of 3 to 10')
+    parser.add_argument('--builds', type=int, default=10, help='Number of recent builds to check for test failure occurrence. Please provide any value in the range of 2 to 20')
+    parser.add_argument('--frequency', type=int, default=3, help='Minimum count of test failure occurrence. Please provide any value in the range of 2 to 20')
     args = parser.parse_args()
-    if not 3 <= args.latest_build <= 20:
-        parser.error("Value in range of 3 to 20")
+    if not 2 <= args.builds <= 20:
+        parser.error("Number of recent builds to check for test failure occurrence must be in the range of 2 to 20")
     else:
-        n_build = args.latest_build
+        n_build = args.builds
     
     if not 2 <= args.frequency <= 10:
-        parser.error("Value in range of 2 to 10")
+        parser.error("Minimum count of test failure, must be in range of 2 to 10")
     else:
         frequency1 = args.frequency
 
@@ -74,10 +74,11 @@ def main():
                 i=i+1
                 print(i,". ",testcase)
                 print("Failed in {}/{} builds".format(fail_freq, n_build))
+                print("\n")
             for i in range(0,len(tc_list[1])):
                 match = re.search(pattern_job_id, i)
                 job_id = match.group(1)
-                print(job_id, "this job has a huge testcase failures please check it")
+                print(job_id, " this job has a huge testcase failures please check it")
             print("---------------------------------------------------------------------------")
         elif flag1 and (not flag2):
             i=0
@@ -87,6 +88,7 @@ def main():
                 i=i+1
                 print(i,". ",testcase)
                 print("Failed in {}/{} builds".format(fail_freq, n_build))
+                print("\n")
             print("---------------------------------------------------------------------------")
         elif (not flag1) and flag2:
             print(ci_name)
@@ -94,7 +96,7 @@ def main():
             for i in range(0,len(tc_list[1])):
                 match = re.search(pattern_job_id, i)
                 job_id = match.group(1)
-                print(job_id, "this job has a huge testcase failures please check it")
+                print(job_id," this job has a huge testcase failures please check it")                
             print("---------------------------------------------------------------------------")
             
 if __name__ == "__main__":
