@@ -72,6 +72,6 @@ Create a virtualenv if required and install required packages using "pip install
 
     ```python3 tracker.py --builds 10 --frequency 3```
 
-    1. builds: This arguments accepts int value, which will query for failed testcases in "n" latest build run in the CI, default value set is 10.
-    2. frequency: This arguments accepts int value, which specifies the frequency threshold and report the testcases which are failing above the frequency, default value set is 3.
+    1. builds: This argument accepts int value, which will query for failed testcases in "n" latest build run in the CI, default value set is 10.
+    2. frequency: This argument accepts int value, which specifies the frequency threshold and report the testcases which are failing above the frequency, default value set is 3.
 

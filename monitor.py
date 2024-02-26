@@ -975,9 +975,7 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
         print(job_list)
         return 1
     summary_list = []   
-    if len(job_list) == 0:
-        print ("No job runs on {} ".format(prow_ci_name))
-
+    
     i=0
 
     pattern_job_id =  r'/(\d+)'

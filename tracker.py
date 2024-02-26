@@ -36,12 +36,12 @@ def main():
     parser.add_argument('--frequency', type=int, default=3, help='Minimum count of test failure occurrence. Please provide any value in the range of 2 to 20')
     args = parser.parse_args()
     if not 2 <= args.builds <= 20:
-        parser.error("Number of recent builds to check for test failure occurrence must be in the range of 2 to 20")
+        parser.error("Number of recent builds to check for testcase failure occurrence must be in the range of 2 to 20")
     else:
         n_build = args.builds
     
     if not 2 <= args.frequency <= 10:
-        parser.error("Minimum count of test failure, must be in range of 2 to 10")
+        parser.error("Minimum count of testcase failure occurrence must be in range of 2 to 10")
     else:
         frequency1 = args.frequency
 
