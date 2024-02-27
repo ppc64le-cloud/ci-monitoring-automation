@@ -105,6 +105,59 @@ def get_jobs(prow_link):
     except json.JSONDecodeError as e:
         return "Failed to extract the spy-links"
 
+def get_n_recent_jobs(prow_link,n):
+    
+    '''
+    Gets SpyglassLink of all the 'n' latest jobs run on the prowCI.
+
+    Parameter:
+        prow_link (string):  keyword used to generate CI link
+        n (int): number of latest jobs
+
+    Returns:
+        list(strings): SpyglassLinks of jobs
+    '''
+
+    url = PROW_URL + prow_link
+
+    try:
+        response = requests.get(url, verify=False, timeout=15)
+    
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            script_elements = soup.find_all('script')
+            selected_script_element = None
+
+            for script_element in script_elements:
+                script_content = script_element.string
+                if script_content:
+                    if 'allBuilds' in script_content:
+                        selected_script_element = script_content
+                        break
+        
+            if selected_script_element:
+                var_name = 'allBuilds'
+                pattern = rf'{var_name}\s*=\s*(.*?);'
+
+                match = re.search(pattern, selected_script_element)
+                if match:
+                    all_jobs=match.group(1)
+                    all_jobs_parsed=json.loads(all_jobs)
+                    n_jobs=[]
+                    for ele in all_jobs_parsed[:n]:
+                        if ele["Result"] != "PENDING":
+                            n_jobs.append(ele["SpyglassLink"])
+                    return n_jobs                   
+        else:
+            return "Failed to get the prowCI response"
+    except requests.Timeout as e:
+        return "Request timed out"
+    except requests.RequestException as e:
+        return "Error while sending request to url"
+    except json.JSONDecodeError as e:
+        return "Failed to extract the spy-links"
+
+
 def cluster_deploy_status(spy_link):
 
     '''
@@ -531,7 +584,7 @@ def get_failed_monitor_testcases_from_xml(spy_link,job_type):
 
 
 
-def get_testcase_frequency(spylinks, zone, tc_name = None):
+def get_testcase_frequency(spylinks, zone=None, tc_name = None):
     """
     To get the testcases failing with its frequency
 
@@ -922,9 +975,7 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
         print(job_list)
         return 1
     summary_list = []   
-    if len(job_list) == 0:
-        print ("No job runs on {} ".format(prow_ci_name))
-
+    
     i=0
 
     pattern_job_id =  r'/(\d+)'
