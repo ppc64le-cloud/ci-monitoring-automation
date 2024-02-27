@@ -63,8 +63,9 @@ def check_for_node_crashes(job_list, zone):
         cluster_deploy_status = monitor.cluster_deploy_status(url)
         if cluster_deploy_status == 'SUCCESS':
             node_status = monitor.get_node_status(url)
-            print(job_id,node_status)
+        print(job_id,node_status)
         monitor.check_node_crash(url)
+        print("--------------------------------------------------------------------------------------------------")
 
 def get_failed_testcases(spylinks, zone):
     """
@@ -107,8 +108,7 @@ def print_tc_frequency(spylinks, zone, tc_name = None):
     frequency = monitor.get_testcase_frequency(spylinks,zone,tc_name)
     table_data = [(key,value) for key, value in frequency.items()]
     print(tabulate(table_data, headers = ['Testcase','Frequency'], tablefmt='grid'))
-print("--------------------------------------------------------------------------------------------------")
-print("\n")
+
 
 def get_testcase_failure(spylinks, zone, tc_name):
     """
@@ -193,6 +193,38 @@ def display_ci_links(config_data):
     
     return selected_config_data
 
+def get_query_options():
+    if JENKINS == "False":
+        print("Please select one of the option from Job History functionalities: ")
+        print("1. Check Node Crash")
+        print("2. Brief Job information")
+        print("3. Detailed Job information")
+        print("4. Failed testcases")
+        print("5. Get builds with testcase failure")
+        print("6. Get testcase failure frequency")
+        option = input("Enter the option: ")
+
+    elif JENKINS == "True":
+        option = config_vars.get('Settings','query_option')
+
+    return option
+
+def get_testcase_names():
+    tc_list=[]
+    if JENKINS == "False":
+        tc_name = input("Enter the testcase names comma seperated: ")
+        if len(tc_name) == 0:
+            return None
+        elif len(tc_name) > 0: 
+            tc_list =  tc_name.split(",")
+            return tc_list
+    if JENKINS == "True":
+        tc_name = config_vars.get('Settings','query_option')
+        if len(tc_name) == 0:
+            return None
+        elif len(tc_name) > 0: 
+            tc_list =  tc_name.split(",")
+            return tc_list
 
 def main():
     parser = argparse.ArgumentParser(description='Get the job history')
@@ -215,19 +247,7 @@ def main():
     if isinstance(ci_list,dict):
         start_date,end_date = get_date_input()
         if start_date != None and end_date != None:
-            if JENKINS == "False":
-                print("Please select one of the option from Job History functionalities: ")
-                print("1. Check Node Crash")
-                print("2. Brief Job information")
-                print("3. Detailed Job information")
-                print("4. Failed testcases")
-                print("5. Get builds with testcase failure")
-                print("6. Get testcase failure frequency")
-
-                option = input("Enter the option: ")
-            elif JENKINS == "True":
-                option = config_vars.get('Settings','query_option')
-
+            option = get_query_options()
             print("Checking runs from",end_date,"to",start_date)
     
             if option == '1':
@@ -265,8 +285,11 @@ def main():
                     monitor.final_job_list = []
             
             if option == '5':
-                tc_name = input("Enter the testcase names comma seperated: ")
-                tc_list =  tc_name.split(",")
+                tc_list =  get_testcase_names()
+
+                if tc_list == None:
+                    print("Please provide atleast one testcase name:")
+                    return 1
 
                 for ci_name,ci_link in ci_list.items():
                     print("-------------------------------------------------------------------------------------------------")
@@ -281,10 +304,7 @@ def main():
                     monitor.final_job_list = []
 
             if option == '6':
-                  tc_name = input("Enter the testcase names comma seperated (Leave it empty to fetch all tcs frequency): ")
-                  tc_list = None 
-                  if bool(tc_name):
-                      tc_list =  tc_name.split(",") 
+                  tc_list = get_testcase_names()
                     
                   for ci_name,ci_link in ci_list.items():
                     print("-------------------------------------------------------------------------------------------------")

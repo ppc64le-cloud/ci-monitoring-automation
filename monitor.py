@@ -1077,5 +1077,3 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
         print ("\n{}/{} deploys succeeded".format(deploy_count, len(job_list)))
         print ("{}/{} e2e tests succeeded".format(e2e_count, len(job_list)))
         print("--------------------------------------------------------------------------------------------------")
-    else:
-        print ("No job runs on {} ".format(prow_ci_name))
