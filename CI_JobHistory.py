@@ -313,6 +313,7 @@ def main():
                         print("Tests execution is not yet supported in SNO")
                         continue
                     spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
+                    print(len(spy_links),"builds have run in the date range of",start_date,"to",end_date)
                     print_tc_frequency(spy_links,zone=args.zone,tc_name=tc_list)
                     monitor.final_job_list = []
 
