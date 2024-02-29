@@ -8,9 +8,23 @@ from datetime import datetime
 import xml.etree.ElementTree as ET
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-PROW_URL = "https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/"
+PROW_URL = ""
 PROW_VIEW_URL = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs"
 
+def set_prow_url(ci_job_type: str)->str:
+    '''
+    Returns PROW_URL value based on command line argument job_type
+
+    Parameter:
+        ci_job_type(string): value of command line argument job_type
+    
+    Returns:
+        string: Value of PROW_URL
+    '''
+    if ci_job_type == 'p' or ci_job_type == 'z':
+        return "https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/"
+    elif ci_job_type == 'pa':
+        return "https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/"
 
 def load_config(config_file):
 
@@ -1023,7 +1037,9 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
     else:
         job_list = get_jobs(prow_ci_link)
     print("--------------------------------------------------------------------------------------------------")
-    print(prow_ci_name)
+    
+    if len(job_list) > 0: 
+        print(prow_ci_name)
 
     if isinstance(job_list,str):
         print(job_list)
