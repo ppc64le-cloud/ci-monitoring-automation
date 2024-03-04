@@ -25,10 +25,12 @@ Create a virtualenv if required and install required packages using "pip install
 
 ### Config files
 
-1. **p_config.json:** The p_config.json file will have ci name and ci links of ppc64le architecture CI in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
+1. **p_periodic.json:** The p_periodic.json file will have ci name and ci links of ppc64le architecture periodic jobs in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
 
 
-2. **z_config.json:** The p_config.json file will have ci name and ci links of s390x architecture CI in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
+2. **z_periodic.json:** The z_periodic.json file will have ci name and ci links of s390x architecture periodic jobs in the key value pair where value of ci link will be prow periodic job name.The new CI's can be easily integrated by adding the ci name and ci link in the config.json file.
+
+3. **p_auxillary.json:** The p_auxillary.json file will have ci name and ci links of ppc64le architecture auxilliary jobs in the key value pair where value of ci link will be prow ecosystem, jenkins, fips serial and compact job name.The new CI's can be easily integrated by adding the ci name and ci link in the p_auxillary.json file.
  
 
 ### Usage

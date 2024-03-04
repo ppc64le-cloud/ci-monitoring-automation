@@ -13,15 +13,16 @@ def main():
     parser = argparse.ArgumentParser(description='Get the daily buid updates')
     parser.add_argument('--info_type', default='brief', choices=['brief','detailed'], help='specify the job info type (brief or detailed)')
     parser.add_argument('--zone', help='specify the lease/zone', type= lambda arg:arg.split(','))
-    parser.add_argument('--ci_arch', default='p', choices=['p','z'], help='Specify the CI architecture type (p or z), default is p')
+    parser.add_argument('--job_type', default='p', choices=['p','z','pa'], help='Specify the CI job type (Power(p) or s390x(z) or Power Auxillary(pa)), default is p')
     args = parser.parse_args()
-    if args.ci_arch == 'p':
-        config_file = 'p_config.json'
-    elif args.ci_arch == 'z':
-        config_file = 'z_config.json'
-    else:
-        print("Invalid argument. Please use p or z")
-        return
+    if args.job_type == 'p':
+        config_file = 'p_periodic.json'
+    elif args.job_type == 'z':
+        config_file = 'z_periodic.json'
+    elif args.job_type == 'pa':
+        config_file = 'p_auxillary.json'
+    
+    monitor.PROW_URL = monitor.set_prow_url(args.job_type)
     config_data = monitor.load_config(config_file)
     if args.info_type == "brief":
         summary_list = []

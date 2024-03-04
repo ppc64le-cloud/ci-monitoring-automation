@@ -75,7 +75,7 @@ def main():
                 print(i,". ",testcase)
                 print("Failed in {}/{} builds".format(fail_freq, n_build))
                 print("\n")
-            for i in range(0,len(tc_list[1])):
+            for i in tc_list[1]:
                 match = re.search(pattern_job_id, i)
                 job_id = match.group(1)
                 print(job_id, " this job has a huge testcase failures please check it")
@@ -93,7 +93,7 @@ def main():
         elif (not flag1) and flag2:
             print(ci_name)
             print("---------------------------------------------------------------------------")
-            for i in range(0,len(tc_list[1])):
+            for i in tc_list[1]:
                 match = re.search(pattern_job_id, i)
                 job_id = match.group(1)
                 print(job_id," this job has a huge testcase failures please check it")                

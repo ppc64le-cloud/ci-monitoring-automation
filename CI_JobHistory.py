@@ -55,6 +55,7 @@ def check_for_node_crashes(job_list, zone):
     """
     pattern = r'/(\d+)'   
     for url in job_list:
+        node_status = ''
         match = re.search(pattern, url)
         job_id = match.group(1)
         lease,_ = monitor.get_quota_and_nightly(url)
@@ -219,7 +220,7 @@ def get_testcase_names():
             tc_list =  tc_name.split(",")
             return tc_list
     if JENKINS == "True":
-        tc_name = config_vars.get('Settings','query_option')
+        tc_name = config_vars.get('Settings','tc_name')
         if len(tc_name) == 0:
             return None
         elif len(tc_name) > 0: 
@@ -229,20 +230,20 @@ def get_testcase_names():
 def main():
     parser = argparse.ArgumentParser(description='Get the job history')
     parser.add_argument('--zone', help='specify the lease/zone', type= lambda arg:arg.split(','))
-    parser.add_argument('--ci_arch', default='p', choices=['p','z'], help='Specify the CI architecture type (p or z), default is p')
+    parser.add_argument('--job_type', default='p', choices=['p','z','pa'], help= 'Specify the CI job type (Power(p) or s390x(z) or Power Auxillary(pa)), default is p')
 
     args = parser.parse_args()
 
-    if args.ci_arch == 'p':
-        config_file = 'p_config.json'
-    elif args.ci_arch == 'z':
-        config_file = 'z_config.json'
-    else:
-        print("Invalid argument. Please use p or z")
-        return 
-
+    if args.job_type == 'p':
+        config_file = 'p_periodic.json'
+    elif args.job_type == 'z':
+        config_file = 'z_periodic.json'
+    elif args.job_type == 'pa':
+        config_file = 'p_auxillary.json'
+    
+    monitor.PROW_URL = monitor.set_prow_url(args.job_type)
     config_data = monitor.load_config(config_file)
-
+    
     ci_list = display_ci_links(config_data)
     if isinstance(ci_list,dict):
         start_date,end_date = get_date_input()
