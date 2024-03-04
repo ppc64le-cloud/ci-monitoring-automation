@@ -31,10 +31,11 @@ def get_tc_frequency(tc_list,frequency):
 
 def main():
     parser = argparse.ArgumentParser(description='Get the daily buid updates')
-    parser.add_argument('--ci_arch', default='p', choices=['p','z'], help='Specify the CI architecture type (p or z), default is p')
     parser.add_argument('--builds', type=int, default=10, help='Number of recent builds to check for test failure occurrence. Please provide any value in the range of 2 to 20')
     parser.add_argument('--frequency', type=int, default=3, help='Minimum count of test failure occurrence. Please provide any value in the range of 2 to 20')
+    parser.add_argument('--job_type', default='p', choices=['p','z','pa'], help='Specify the CI job type (Power(p) or s390x(z) or Power Auxillary(pa)), default is p')
     args = parser.parse_args()
+
     if not 2 <= args.builds <= 20:
         parser.error("Number of recent builds to check for testcase failure occurrence must be in the range of 2 to 20")
     else:
@@ -44,15 +45,17 @@ def main():
         parser.error("Minimum count of testcase failure occurrence must be in range of 2 to 10")
     else:
         frequency1 = args.frequency
-
-    if args.ci_arch == 'p':
-        config_file = 'p_config.json'
-    elif args.ci_arch == 'z':
-        config_file = 'z_config.json'
-    else:
-        print("Invalid argument. Please use p or z")
-        return 1
+    
+    if args.job_type == 'p':
+        config_file = 'p_periodic.json'
+    elif args.job_type == 'z':
+        config_file = 'z_periodic.json'
+    elif args.job_type == 'pa':
+        config_file = 'p_auxillary.json'
+    
+    monitor.PROW_URL = monitor.set_prow_url(args.job_type)
     config_data = monitor.load_config(config_file)
+
     updated_ci_dict = filter_latest_ci_lv1(config_data,n_build)
     for ci_name,tc_list in updated_ci_dict.items():
         pattern_job_id =  r'/(\d+)'
@@ -78,7 +81,7 @@ def main():
             for i in tc_list[1]:
                 match = re.search(pattern_job_id, i)
                 job_id = match.group(1)
-                print(job_id, " this job has a huge testcase failures please check it")
+                print(job_id, "this job has a huge testcase failures please check it")
             print("---------------------------------------------------------------------------")
         elif flag1 and (not flag2):
             i=0
@@ -96,7 +99,7 @@ def main():
             for i in tc_list[1]:
                 match = re.search(pattern_job_id, i)
                 job_id = match.group(1)
-                print(job_id," this job has a huge testcase failures please check it")                
+                print(job_id,"this job has a huge testcase failures please check it")                
             print("---------------------------------------------------------------------------")
             
 if __name__ == "__main__":
