@@ -761,7 +761,7 @@ def get_all_failed_tc(spylink,jobtype):
 
     failed_tc = {"conformance": conformance, "symptom_detection": symptom_detection}
 
-    if "4.15" in spylink:
+    if "4.15" in spylink and (not "mce" in spylink):
         monitor_tc_failures = get_failed_monitor_testcases(spylink,jobtype)
         monitor=[]
         if isinstance(monitor_tc_failures,list):
@@ -1036,9 +1036,9 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
         job_list = get_jobs_with_date(prow_ci_link,start_date,end_date)
     else:
         job_list = get_jobs(prow_ci_link)
-    print("--------------------------------------------------------------------------------------------------")
     
     if len(job_list) > 0: 
+        print("--------------------------------------------------------------------------------------------------")
         print(prow_ci_name)
 
     if isinstance(job_list,str):

@@ -67,6 +67,7 @@ Create a virtualenv if required and install required packages using "pip install
         before_date: End date.
         after_date: Start date.
         query_option: Query code to fetch information from builds.
+        tc_name: Testcase name which will be used in quering the failure frequency.
         ```
 
 
