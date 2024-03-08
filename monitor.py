@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 PROW_URL = ""
 PROW_VIEW_URL = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs"
+final_job_list=[]
 
 def set_prow_url(ci_job_type: str)->str:
     '''
@@ -511,9 +512,11 @@ def get_failed_monitor_testcases(spy_link,job_type):
         job_type (string):  Keyword used to construct url to access the logs of a job.
 
     Returns:
-        list(dict): List of failed monitor testcases.
+        list: List of failed monitor testcases.
+        str: Message if any error occured.
     '''
 
+    monitor_tc_failures = []
     test_log_junit_dir_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/openshift-e2e-libvirt-test/artifacts/junit/"
 
     try:
@@ -529,46 +532,21 @@ def get_failed_monitor_testcases(spy_link,job_type):
                 response_2 = requests.get(test_log_url,verify=False, timeout=15)
                 if response_2.status_code == 200:
                     data = response_2.json()
-                    e2e_failure_list = data['Tests']
-                    return e2e_failure_list
+                    for tc in data['Tests']:
+                        monitor_tc_failures.append(tc["Test"]["Name"])
+                    return monitor_tc_failures, None
                 else:
-                    return "Failed to get response from e2e-test log file url!"
+                    return monitor_tc_failures, "Failed to get response from e2e-test log file url!"
             else:
-                return "Test summary file not found"
+                return monitor_tc_failures, "Test summary file not found"
         else:
-            return "Failed to get response from e2e-test directory url"
+            return monitor_tc_failures, "Failed to get response from e2e-test directory url"
     except requests.Timeout:
-        return "Request timed out"
+        return monitor_tc_failures, "Request timed out"
     except requests.RequestException:
-        return "Error while sending request to url"
+        return monitor_tc_failures, "Error while sending request to url"
     except json.JSONDecodeError as e:
-        return "Failed to parse the data from e2e-test log file!"
-
-def get_failed_monitor_testcases_lv2(spylink, jobtype):
-
-    '''
-    Processes the output received from get_failed_monitor_testcases() function
-
-    Parameter:
-        spylink (string):  SpyglassLink used to generate url to access logs of a job.
-        jobtype (string):  Keyword used to construct url to access logs of a job.
-
-    Returns:
-        list: list of failed monitor testcases.
-        int: Count of total failed testcases
-    '''
-
-    monitor=[]
-    monitor_failed_tc_count = 0
-    monitor_tc_failures = get_failed_monitor_testcases(spylink,jobtype)
-    if isinstance(monitor_tc_failures,list):
-        monitor_failed_tc_count = len(monitor_tc_failures)
-        for tc in monitor_tc_failures:
-            monitor.append(tc["Test"]["Name"])
-    elif isinstance(monitor_tc_failures,str):
-        monitor_failed_tc_count = -5000
-        monitor=[monitor_tc_failures]
-    return monitor,monitor_failed_tc_count
+        return monitor_tc_failures, "Failed to parse the data from e2e-test log file!"
 
 
 def get_failed_monitor_testcases_from_xml(spy_link,job_type):
@@ -581,9 +559,11 @@ def get_failed_monitor_testcases_from_xml(spy_link,job_type):
         job_type (string):  Keyword used to construct url to access logs of a job.
 
     Returns:
-        list(string): List of failed monitor testcases.
+        list: List of failed monitor testcases.
+        str: Message if any error occured.
     '''
 
+    monitor_failed_testcase=[]
     if "mce" in spy_link:
         test_type = "conformance-tests"
     else:
@@ -599,7 +579,6 @@ def get_failed_monitor_testcases_from_xml(spy_link,job_type):
             if test_failure_summary_filename_match is not None:
                 test_failure_summary_filename_str = test_failure_summary_filename_match.group(1)
                 test_log_url=PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/"+ test_type +"/artifacts/junit/" + test_failure_summary_filename_str
-                monitor_failed_testcase=[]
                 response = requests.get(test_log_url,verify=False,timeout=15)
                 if response.status_code == 200:
                     root = ET.fromstring(response.content)
@@ -610,42 +589,18 @@ def get_failed_monitor_testcases_from_xml(spy_link,job_type):
                             prev_testcase = root[idx-1] if idx-1 >= 0 else None
                             if next_testcase is not None and next_testcase.get('name') != current_name and prev_testcase is not None and prev_testcase.get('name') != current_name:
                                 monitor_failed_testcase.append(current_name)
-                    return monitor_failed_testcase
+                    return monitor_failed_testcase, None
             else:
-                return "Monitor test file not found"
+                return monitor_failed_testcase, "Monitor test file not found"
         else:
-            return "Failed to get response from e2e-test directory url" 
+            return monitor_failed_testcase, "Failed to get response from e2e-test directory url" 
     except requests.Timeout:
-        return "Request timed out"
+        return monitor_failed_testcase, "Request timed out"
     except requests.RequestException:
-        return "Error while sending request to url"
+        return monitor_failed_testcase, "Error while sending request to url"
     except ET.ParseError as e:
-        return "Failed to parse junit e2e log file!"
+        return monitor_failed_testcase, "Failed to parse junit e2e log file!"
 
-def get_failed_monitor_testcases_from_xml_lv2(spylink,jobtype):
-
-    '''
-    Processes the output received from get_failed_monitor_testcases_from_xml() function
-
-    Parameter:
-        spylink (string):  SpyglassLink used to generate url to access logs of a job.
-        jobtype (string):  Keyword used to construct url to access logs of a job.
-
-    Returns:
-        list: list of failed monitor testcases.
-        int: Count of total failed testcases
-    '''
-
-    monitor=[]
-    monitor_failed_tc_count = 0
-    monitor_tc_failures = get_failed_monitor_testcases_from_xml(spylink,jobtype)
-    if isinstance(monitor_tc_failures,list):
-        monitor_failed_tc_count = len(monitor_tc_failures)
-        monitor=monitor_tc_failures
-    elif isinstance(monitor_tc_failures,str):
-        monitor_failed_tc_count = -5000
-        monitor=[monitor_tc_failures]
-    return monitor,monitor_failed_tc_count
 
 def get_testcase_frequency(spylinks, zone=None, tc_name = None):
     """
@@ -668,7 +623,7 @@ def get_testcase_frequency(spylinks, zone=None, tc_name = None):
             continue
         cluster_status=cluster_deploy_status(spylink)
         if cluster_status == 'SUCCESS':
-            tc_failures,_ = get_all_failed_tc(spylink,job_type)
+            tc_failures,_,_ = get_all_failed_tc(spylink,job_type)
             for _,value in tc_failures.items():
                 if len(value) !=0:
                     for tc in value:
@@ -696,9 +651,12 @@ def get_failed_e2e_testcases(spy_link,job_type):
         job_type (string):  Keyword used to construct url to access logs of a job.
 
     Returns:
-        list(dict): List of failed conformance testcases.
+        list: List of failed conformance testcases.
+        str: Message if any error occured. 
+
     '''
 
+    conformance_tc_failures=[]
     if "mce" in spy_link:
         test_type = "conformance-tests"
     else:
@@ -717,48 +675,22 @@ def get_failed_e2e_testcases(spy_link,job_type):
                 response_2 = requests.get(test_log_url,verify=False, timeout=15)
                 if response_2.status_code == 200:
                     data = response_2.json()
-                    e2e_failure_list = data['Tests']
-                    return e2e_failure_list
+                    for tc in data['Tests']:
+                        conformance_tc_failures.append(tc["Test"]["Name"])
+                    return conformance_tc_failures, None
                 else:
-                    return "Failed to get response from e2e-test log file url!"
+                    return conformance_tc_failures, "Failed to get response from e2e-test log file url!"
             else:
-                return "Test summary file not found"
+                return conformance_tc_failures, "Test summary file not found"
         else:
-            return "Failed to get response from e2e-test directory url" 
+            return conformance_tc_failures, "Failed to get response from e2e-test directory url" 
     except requests.Timeout:
-        return "Request timed out"
+        return conformance_tc_failures, "Request timed out"
     except requests.RequestException:
-        return "Error while sending request to url"
+        return conformance_tc_failures, "Error while sending request to url"
     except json.JSONDecodeError as e:
-        return "Failed to parse the data from e2e-test log file!"
+        return conformance_tc_failures, "Failed to parse the data from e2e-test log file!"
 
-def get_failed_e2e_testcases_lv2(spylink,jobtype):
-
-    '''
-    Processes the output received from get_failed_e2e_testcases() function
-
-    Parameter:
-        spylink (string):  SpyglassLink used to generate url to access logs of a job.
-        jobtype (string):  Keyword used to construct url to access logs of a job.
-
-    Returns:
-        list: list of failed conformance testcases.
-        int: Count of total failed testcases
-    '''
-
-    conformance=[]
-    conformance_failed_tc_count = 0
-    conformance_tc_failures = get_failed_e2e_testcases(spylink,jobtype)
-
-    if isinstance(conformance_tc_failures,list):
-        conformance_failed_tc_count = len(conformance_tc_failures)
-        for tc in conformance_tc_failures:
-            conformance.append(tc["Test"]["Name"])
-    elif isinstance(conformance_tc_failures,str):
-        conformance_failed_tc_count = -5000
-        conformance=[conformance_tc_failures]
-        
-    return conformance, conformance_failed_tc_count
 
 def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
 
@@ -770,8 +702,11 @@ def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
         job_type (string):  Keyword used to construct url to access logs of a job.
 
     Returns:
-        list(string): List of failed symptom detection testcases.
+        list: List of failed symptom detection testcases.
+        str: Message if any error occured.
     '''
+
+    symptom_detection_failed_testcase = []
 
     if "power" in spy_link:
         job_type=job_type+"/gather-extra"
@@ -788,42 +723,16 @@ def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
                 testcase_name = testcase.get('name')
                 if testcase.find('failure') is not None:
                     symptom_detection_failed_testcase.append(testcase_name)
-            return symptom_detection_failed_testcase
+            return symptom_detection_failed_testcase, None
         else:
-            return 'Error fetching junit symptom detection test results'
+            return symptom_detection_failed_testcase, 'Error fetching junit symptom detection test results'
     except requests.Timeout:
-        return "Request timed out"
+        return symptom_detection_failed_testcase, "Request timed out"
     except requests.RequestException:
-        return "Error while sending request to url"
+        return symptom_detection_failed_testcase, "Error while sending request to url"
     except ET.ParseError as e:
-        return "Failed to parse junit e2e log file!"
+        return symptom_detection_failed_testcase, "Failed to parse symptom detection e2e log file!"
 
-def get_junit_symptom_detection_testcase_failures_lv2(spylink,jobtype):
-
-    '''
-    Processes the output received from get_junit_symptom_detection_testcase_failures() function
-
-    Parameter:
-        spylink (string):  SpyglassLink used to generate url to access logs of a job.
-        jobtype (string):  Keyword used to construct url to access logs of a job.
-
-    Returns:
-        list: list of failed symptom detection testcases.
-        int: Count of total failed testcases
-    '''
-
-    symptom_detection=[]
-    symptom_failed_tc_count = 0
-    symptom_detection_tc_failures = get_junit_symptom_detection_testcase_failures(spylink,jobtype)
-
-    if isinstance(symptom_detection_tc_failures,list):
-        symptom_failed_tc_count = len(symptom_detection_tc_failures)
-        symptom_detection = symptom_detection_tc_failures
-    elif isinstance(symptom_detection_tc_failures,str):
-        symptom_failed_tc_count = -5000    
-        symptom_detection=[symptom_detection_tc_failures]
-        
-    return symptom_detection, symptom_failed_tc_count
 
 def get_all_failed_tc(spylink,jobtype):
 
@@ -836,25 +745,37 @@ def get_all_failed_tc(spylink,jobtype):
 
     Returns:
         dict: Dictionary of failed testcases of all testsuites.
+        dict: Error messages encountered while getting test summary files.
         int: Count of total failed testcases
     '''
-
+    conformance_failed_tc_count = 0
     monitor_failed_tc_count = 0
-    conformance,conformance_failed_tc_count = get_failed_e2e_testcases_lv2(spylink,jobtype)
+    symptom_failed_tc_count = 0
+    failed_tc_count = 0
+    monitor_err_obj = None
+    error_object = {}
+    conformance, conformance_error_obj = get_failed_e2e_testcases(spylink,jobtype)
 
-    symptom_detection,symptom_failed_tc_count=get_junit_symptom_detection_testcase_failures_lv2(spylink,jobtype)
+    symptom_detection, symptom_error_obj = get_junit_symptom_detection_testcase_failures(spylink,jobtype)
 
     failed_tc = {"conformance": conformance, "symptom_detection": symptom_detection}
 
-    if "4.15" in spylink and (not "mce" in spylink):
-        monitor,monitor_failed_tc_count=get_failed_monitor_testcases_lv2(spylink,jobtype)
+    conformance_failed_tc_count = len(failed_tc["conformance"])
+    symptom_failed_tc_count = len(failed_tc["symptom_detection"])
+
+    if ("4.15" in spylink or "4.16" in spylink) and (not "mce" in spylink):
+        monitor, monitor_err_obj=get_failed_monitor_testcases(spylink,jobtype)
         failed_tc = {"conformance": conformance, "monitor": monitor, "symptom_detection": symptom_detection}
+        monitor_failed_tc_count = len(failed_tc["monitor"])
     elif "4.14" in spylink or "mce" in spylink:
-        monitor,monitor_failed_tc_count=get_failed_monitor_testcases_from_xml_lv2(spylink,jobtype)
+        monitor, monitor_err_obj = get_failed_monitor_testcases_from_xml(spylink,jobtype)
         failed_tc = {"conformance": conformance, "monitor": monitor, "symptom_detection": symptom_detection}
+        monitor_failed_tc_count = len(failed_tc["monitor"])
     
     failed_tc_count=conformance_failed_tc_count+symptom_failed_tc_count+monitor_failed_tc_count
-    return failed_tc,failed_tc_count
+    error_object = {"conformance": conformance_error_obj, "monitor": monitor_err_obj, "symptom_detection": symptom_error_obj}
+
+    return failed_tc,failed_tc_count,error_object
 
 def check_ts_exe_status(spylink,jobtype):
     '''
@@ -904,10 +825,10 @@ def print_all_failed_tc(spylink,jobtype):
     test_exe_status = check_ts_exe_status(spylink,jobtype)
 
     if test_exe_status == "FAILURE":
-        tc_failures, fail_count = get_all_failed_tc(spylink,jobtype)
-        if fail_count <= 5:
+        tc_failures, fail_count, error_object = get_all_failed_tc(spylink,jobtype)
+        if 0 < fail_count <= 5:
             for key,value in tc_failures.items():
-                if len(value) !=0:
+                if len(value) > 0:
                     print(key,'testcase failures')
                     for tc in value:
                         print(tc)
@@ -915,32 +836,45 @@ def print_all_failed_tc(spylink,jobtype):
                     print('All',key,'testcases passed')
         elif fail_count > 5:
             print(fail_count,"testcases have failed, please refer to the job link for more information")
+
+        if error_object:
+            for key,value in error_object.items():
+                if value:
+                    print(key,'test suite error message: ')
+                    print(value)
         return "FAILURE"
+    
     elif test_exe_status == "SUCCESS":
-        sym,symcount = get_junit_symptom_detection_testcase_failures_lv2(spylink,jobtype)
-        if symcount > 0:
-            print("Symptom Detection Test failures:")
-            for i in sym:
-                print(i)
-            return "FAILURE"
+        sym,sym_error_object = get_junit_symptom_detection_testcase_failures(spylink,jobtype)
+        if not sym_error_object:
+            symcount = len(sym)
+            if symcount > 0:
+                print("Symptom Detection Test failures:")
+                for i in sym:
+                    print(i)
+                return "FAILURE"
+            elif symcount == 0:
+                print("All the Testcases have passed")
+                return "SUCCESS"
         else:
-            print("All the Testcases have passed")
-            return "SUCCESS"
+            print(sym_error_object)
+            return "FAILURE"
     elif test_exe_status == "ABORTED":
-        sym,symcount = get_junit_symptom_detection_testcase_failures_lv2(spylink,jobtype)
-        if symcount > 0:
-            print("Symptom Detection Test failures:")
-            for i in sym:
-                print(i)    
+        sym,sym_error_object = get_junit_symptom_detection_testcase_failures(spylink,jobtype)
+        if not sym_error_object:
+            if symcount > 0:
+                print("Symptom Detection Test failures:")
+                for i in sym:
+                    print(i)
+        else:
+            print(sym_error_object)
+        
         print("Test suite execution has been aborted")
         return "ABORTED"
     else:
         print("ERROR")
         return "ERROR"
         
-            
-
-final_job_list=[]
 
 def check_testcase_failure(spylink,job_type,testcase_name):
     """
@@ -953,7 +887,7 @@ def check_testcase_failure(spylink,job_type,testcase_name):
     Return:
         return True if testcase failed in this particular build else return False.
     """
-    failed_tcs,_ = get_all_failed_tc(spylink,job_type)
+    failed_tcs,_,_ = get_all_failed_tc(spylink,job_type)
 
     for _,values in failed_tcs.items():
         if testcase_name in values:
@@ -1138,12 +1072,13 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
         job_dict["Lease"]=lease
         if cluster_status == 'SUCCESS' and "sno" not in prow_ci_link:
             job_type,_ = job_classifier(job)
-            _, e2e_test_result = get_all_failed_tc(job,job_type)
-            if e2e_test_result == 0:
-                job_dict["Test result"] = "PASS"   
-            elif e2e_test_result > 0:
-                job_dict["Test result"] = str(e2e_test_result) + " testcases failed"   
-            elif e2e_test_result < 0:
+            _, e2e_fail_test_count, error_object = get_all_failed_tc(job,job_type)
+            if all(value == None for value in error_object.values()):
+                if e2e_fail_test_count == 0:
+                    job_dict["Test result"] = "PASS"   
+                elif e2e_fail_test_count > 0:
+                    job_dict["Test result"] = str(e2e_fail_test_count) + " testcases failed"   
+            else:
                 job_dict["Test result"] = "Failed to get Test summary"
         summary_list.append(job_dict)
     return summary_list
