@@ -761,7 +761,7 @@ def get_all_failed_tc(spylink,jobtype):
 
     failed_tc = {"conformance": conformance, "symptom_detection": symptom_detection}
 
-    if "4.15" in spylink and (not "mce" in spylink):
+    if ("4.15" in spylink or "4.16" in spylink) and (not "mce" in spylink):
         monitor_tc_failures = get_failed_monitor_testcases(spylink,jobtype)
         monitor=[]
         if isinstance(monitor_tc_failures,list):
