@@ -15,11 +15,12 @@ def filter_latest_ci_lv1(config_data,n_build):
             cluster_status=monitor.cluster_deploy_status(job)
             job_type,_=monitor.job_classifier(job)
             if cluster_status == 'SUCCESS':
-                _ , failed_tc_count = monitor.get_all_failed_tc(job,job_type)
-                if failed_tc_count < 20 and failed_tc_count > 0:
-                    tc_failure_jobs.append(job)
-                elif failed_tc_count > 20:
-                    huge_tc_failure_jobs.append(job)
+                _ , failed_tc_count, error_object = monitor.get_all_failed_tc(job,job_type)
+                if all(value == None for value in error_object.values()):
+                    if failed_tc_count < 20 and failed_tc_count > 0:
+                        tc_failure_jobs.append(job)
+                    elif failed_tc_count > 20:
+                        huge_tc_failure_jobs.append(job)
             final_tc_failure_jobs = [tc_failure_jobs,huge_tc_failure_jobs]
         updated_ci_dict[ci_name] = final_tc_failure_jobs
     return updated_ci_dict
