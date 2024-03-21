@@ -828,10 +828,12 @@ def print_all_failed_tc(spylink,jobtype):
         tc_failures, fail_count, error_object = get_all_failed_tc(spylink,jobtype)
         if 0 < fail_count <= 5:
             for key,value in tc_failures.items():
+                i = 1
                 if len(value) > 0:
-                    print(key,'testcase failures')
+                    print('Failed',key,'testcases: ')
                     for tc in value:
-                        print(tc)
+                        print(str(i)+'.',tc)
+                        i=i+1
                 elif len(value) == 0:
                     print('All',key,'testcases passed')
         elif fail_count > 5:
@@ -862,6 +864,7 @@ def print_all_failed_tc(spylink,jobtype):
     elif test_exe_status == "ABORTED":
         sym,sym_error_object = get_junit_symptom_detection_testcase_failures(spylink,jobtype)
         if not sym_error_object:
+            symcount = len(sym)
             if symcount > 0:
                 print("Symptom Detection Test failures:")
                 for i in sym:
