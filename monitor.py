@@ -173,6 +173,31 @@ def get_n_recent_jobs(prow_link,n):
         return "Failed to extract the spy-links"
 
 
+def check_job_status(spy_link):
+    '''
+    Gets the status of the job if it was a success or failure
+    
+    Parameter:
+        spy_link (string):  SpyglassLink used to generate url to access logs of a job.
+
+    Returns:
+        string: Job run Status 
+    '''
+    job_status_url = PROW_VIEW_URL + spy_link[8:] + '/finished.json'
+    try:
+        response = requests.get(job_status_url, verify=False, timeout=15)
+        if response.status_code == 200:
+            cluster_status = json.loads(response.text)
+            return cluster_status["result"]
+        else:
+            return 'ERROR'
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
+    except json.JSONDecodeError as e:
+        return 'Error while parsing finished.json'
+
 def cluster_deploy_status(spy_link):
 
     '''
@@ -300,10 +325,7 @@ def get_node_status(spy_link):
     '''
     
     job_type,job_platform = job_classifier(spy_link)
-    if job_platform == "powervs" or job_platform == "mce":
-        job_type += "/gather-extra"
-    else:
-        job_type += "/gather-libvirt"
+    job_type += "/gather-extra"
     
     node_log_url = PROW_VIEW_URL + spy_link[8:] + \
         "/artifacts/" + job_type +"/artifacts/oc_cmds/nodes"
@@ -708,22 +730,26 @@ def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
 
     symptom_detection_failed_testcase = []
 
-    if "power" in spy_link:
-        job_type=job_type+"/gather-extra"
-    elif "libvirt" in spy_link:
-        job_type=job_type+"/gather-libvirt"
+    job_type=job_type+"/gather-extra"
 
-    test_log_junit_dir_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/artifacts/junit/junit_symptoms.xml"
+    test_log_junit_dir_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/artifacts/junit/"
     symptom_detection_failed_testcase = []
     try:
         response = requests.get(test_log_junit_dir_url,verify=False,timeout=15)
         if response.status_code == 200:
-            root = ET.fromstring(response.content)
-            for testcase in root.findall('.//testcase'):
-                testcase_name = testcase.get('name')
-                if testcase.find('failure') is not None:
-                    symptom_detection_failed_testcase.append(testcase_name)
-            return symptom_detection_failed_testcase, None
+            junit_failure_summary_filename_re = re.compile('junit_symptoms.xml')
+            junit_failure_summary_filename_match = junit_failure_summary_filename_re.search(response.text, re.MULTILINE|re.DOTALL)
+            if junit_failure_summary_filename_match is not None:
+                test_log_junit_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/artifacts/junit/junit_symptoms.xml"
+                response_2 = requests.get(test_log_junit_url,verify=False,timeout=15)
+                root = ET.fromstring(response_2.content)
+                for testcase in root.findall('.//testcase'):
+                    testcase_name = testcase.get('name')
+                    if testcase.find('failure') is not None:
+                        symptom_detection_failed_testcase.append(testcase_name)
+                return symptom_detection_failed_testcase, None
+            else:
+                return symptom_detection_failed_testcase, "Junit test summary file not found"
         else:
             return symptom_detection_failed_testcase, 'Error fetching junit symptom detection test results'
     except requests.Timeout:
@@ -1117,12 +1143,8 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
     e2e_count = 0
     i=0
 
-    pattern_job_id =  r'/(\d+)'
-
     jobs_to_deleted = []
     for job in job_list:
-        match = re.search(pattern_job_id, job)
-        job_id = match.group(1)
         lease, nightly = get_quota_and_nightly(job)
         if zone is not None and lease not in zone:
             jobs_to_deleted.append(job)
@@ -1130,26 +1152,35 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
         i=i+1
         print(i,"Job link: https://prow.ci.openshift.org/"+job)
         print("Nightly info-", nightly)
-        cluster_status=cluster_deploy_status(job)
-        if "sno" not in job:
-            print("Lease Quota-", lease)    
-            node_status = get_node_status(job)
-            print(node_status)
-        check_node_crash(job)
-
-        if cluster_status == 'SUCCESS':
+        job_status = check_job_status(job)
+        if job_status == 'SUCCESS':
             deploy_count += 1
-            if "sno" not in prow_ci_link:
-                job_type,_ = job_classifier(job)
-                tc_exe_status=print_all_failed_tc(job,job_type)
-                if tc_exe_status=="SUCCESS":
-                    e2e_count=e2e_count+1
+            e2e_count=e2e_count+1
+            check_node_crash(job)
+            print("This is a Green build")
+        elif job_status == 'FAILURE':
+            cluster_status=cluster_deploy_status(job)
+            if "sno" not in job:
+                print("Lease Quota-", lease)    
+                node_status = get_node_status(job)
+                print(node_status)
+            check_node_crash(job)
 
-        elif cluster_status == 'FAILURE':
-            print("Cluster Creation Failed")
+            if cluster_status == 'SUCCESS':
+                deploy_count += 1
+                if "sno" not in prow_ci_link:
+                    job_type,_ = job_classifier(job)
+                    tc_exe_status=print_all_failed_tc(job,job_type)
+                    if tc_exe_status=="SUCCESS":
+                        e2e_count=e2e_count+1
 
-        elif cluster_status == 'ERROR':
-            print('Unable to get cluster status please check prowCI UI ')
+            elif cluster_status == 'FAILURE':
+                print("Cluster Creation Failed")
+
+            elif cluster_status == 'ERROR':
+                print('Unable to get cluster status please check prowCI UI ')
+        else:
+            print(job_status)
 
         print("\n")
         
