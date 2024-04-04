@@ -61,10 +61,12 @@ def check_for_node_crashes(job_list, zone):
         lease,_ = monitor.get_quota_and_nightly(url)
         if zone is not None and lease not in zone :
             continue
+        job_status = monitor.check_job_status(url)
         cluster_deploy_status = monitor.cluster_deploy_status(url)
-        if cluster_deploy_status == 'SUCCESS':
+        print(job_id)
+        if cluster_deploy_status == 'SUCCESS' and job_status == 'FAILURE':
             node_status = monitor.get_node_status(url)
-        print(job_id,node_status)
+            print(node_status)
         monitor.check_node_crash(url)
         print("--------------------------------------------------------------------------------------------------")
 
@@ -86,12 +88,14 @@ def get_failed_testcases(spylinks, zone):
         lease,_ = monitor.get_quota_and_nightly(spylink)
         if zone is not None and lease not in zone :
             continue
-        cluster_status=monitor.cluster_deploy_status(spylink)
-        if cluster_status == 'SUCCESS':
-            j=j+1
-            print(str(j)+".",job_id)
-            monitor.print_all_failed_tc(spylink,job_type)
-            print("\n")
+        job_status=monitor.check_job_status(spylink)
+        if job_status == 'FAILURE':
+            cluster_status=monitor.cluster_deploy_status(spylink)
+            if cluster_status == 'SUCCESS':
+                j=j+1
+                print(str(j)+".",job_id)
+                monitor.print_all_failed_tc(spylink,job_type)
+                print("\n")
     print("--------------------------------------------------------------------------------------------------")
     print("\n")
 
@@ -129,8 +133,10 @@ def get_testcase_failure(spylinks, zone, tc_name):
         lease,_ = monitor.get_quota_and_nightly(spylink)
         if zone is not None and lease not in zone :
             continue
-        cluster_status=monitor.cluster_deploy_status(spylink)
-        if cluster_status == 'SUCCESS':
+        job_status=monitor.check_job_status(spylink)
+        if job_status == 'FAILURE':
+            cluster_status=monitor.cluster_deploy_status(spylink)
+            if cluster_status == 'SUCCESS':
                 if monitor.check_testcase_failure(spylink,job_type,tc_name):
                     j=j+1
                     print(str(j)+"."+"Job_id: "+job_id)

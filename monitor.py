@@ -312,6 +312,25 @@ def cluster_creation_error_analysis(spylink):
     except requests.RequestException:
         return "Error while sending request to url"
 
+#This is a temporary fix to check node details for older jobs.
+def check_if_gather_libvirt_dir_exists(spy_link,job_type):
+    
+    base_artifacts_dir_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type
+
+    try:
+        response = requests.get(base_artifacts_dir_url, verify=False, timeout=15)
+        gather_libvirt_dir_re = re.compile('gather-libvirt')
+        gather_libvirt_dir_re_match = gather_libvirt_dir_re.search(response.text, re.MULTILINE|re.DOTALL)
+        
+        if gather_libvirt_dir_re_match is not None:
+            return True
+        else:
+            return False
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
+
 def get_node_status(spy_link):
 
     '''
@@ -325,7 +344,13 @@ def get_node_status(spy_link):
     '''
     
     job_type,job_platform = job_classifier(spy_link)
-    job_type += "/gather-extra"
+    
+    check_for_gather_libvirt_dir = check_if_gather_libvirt_dir_exists(spy_link,job_type)
+    
+    if check_for_gather_libvirt_dir == True:
+        job_type += "/gather-libvirt"
+    else:
+        job_type += "/gather-extra"
     
     node_log_url = PROW_VIEW_URL + spy_link[8:] + \
         "/artifacts/" + job_type +"/artifacts/oc_cmds/nodes"
@@ -717,7 +742,12 @@ def get_junit_symptom_detection_testcase_failures(spy_link,job_type):
 
     symptom_detection_failed_testcase = []
 
-    job_type=job_type+"/gather-extra"
+    check_for_gather_libvirt_dir = check_if_gather_libvirt_dir_exists(spy_link,job_type)
+    
+    if check_for_gather_libvirt_dir == True:
+        job_type += "/gather-libvirt"
+    else:
+        job_type += "/gather-extra"
 
     test_log_junit_dir_url = PROW_VIEW_URL + spy_link[8:] + "/artifacts/" + job_type + "/artifacts/junit/"
     symptom_detection_failed_testcase = []
@@ -1079,6 +1109,7 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
         lease, _ = get_quota_and_nightly(job)
         if zone is not None and lease not in zone :
             continue
+        job_status = check_job_status(job)
         cluster_status=cluster_deploy_status(job)
         i=i+1
         job_dict = {}
@@ -1086,16 +1117,19 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
         job_dict["Prow Job ID"] = job_id
         job_dict["Install Status"] = cluster_status
         job_dict["Lease"]=lease
-        if cluster_status == 'SUCCESS' and "sno" not in prow_ci_link:
-            job_type,_ = job_classifier(job)
-            _, e2e_fail_test_count, error_object = get_all_failed_tc(job,job_type)
-            if all(value == None for value in error_object.values()):
-                if e2e_fail_test_count == 0:
-                    job_dict["Test result"] = "PASS"   
-                elif e2e_fail_test_count > 0:
-                    job_dict["Test result"] = str(e2e_fail_test_count) + " testcases failed"   
-            else:
-                job_dict["Test result"] = "Failed to get Test summary"
+        if job_status == 'SUCCESS' and "sno" not in prow_ci_link:
+            job_dict["Test result"] = "PASS"
+        elif job_status == 'FAILURE' and "sno" not in prow_ci_link:
+            if cluster_status == 'SUCCESS':
+                job_type,_ = job_classifier(job)
+                _, e2e_fail_test_count, error_object = get_all_failed_tc(job,job_type)
+                if all(value == None for value in error_object.values()):
+                    if e2e_fail_test_count == 0:
+                        job_dict["Test result"] = "PASS"   
+                    elif e2e_fail_test_count > 0:
+                        job_dict["Test result"] = str(e2e_fail_test_count) + " testcases failed"   
+                else:
+                    job_dict["Test result"] = "Failed to get Test summary"
         summary_list.append(job_dict)
     return summary_list
 
