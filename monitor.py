@@ -331,6 +331,23 @@ def check_if_gather_libvirt_dir_exists(spy_link,job_type):
     except requests.RequestException:
         return "Error while sending request to url"
 
+#This is a fix to check for sensitive information expose error.
+def check_if_sensitive_info_exposed(spy_link):
+    
+    build_log_url = PROW_VIEW_URL + spy_link[8:] + '/build-log.txt'
+    try:
+        response = requests.get(build_log_url, verify=False, timeout=15)
+        senstive_info_re = re.compile('This file contained potentially sensitive information and has been removed.')
+        senstive_info_re_match = senstive_info_re.search(response.text)
+        if senstive_info_re_match is not None:
+            return True
+        else:
+            return False
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
+
 def get_node_status(spy_link):
 
     '''
@@ -1111,12 +1128,16 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
             continue
         job_status = check_job_status(job)
         cluster_status=cluster_deploy_status(job)
+        sensitive_info_expose_status=check_if_sensitive_info_exposed(job)
         i=i+1
         job_dict = {}
         job_dict["Build"] = prow_ci_name
         job_dict["Prow Job ID"] = job_id
         job_dict["Install Status"] = cluster_status
-        job_dict["Lease"]=lease
+        if sensitive_info_expose_status == True:
+            job_dict["Lease"]="Build log removed"
+        else:
+            job_dict["Lease"]=lease
         if job_status == 'SUCCESS' and "sno" not in prow_ci_link:
             job_dict["Test result"] = "PASS"
         elif job_status == 'FAILURE' and "sno" not in prow_ci_link:
@@ -1172,11 +1193,22 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
             continue
         i=i+1
         print(i,"Job link: https://prow.ci.openshift.org/"+job)
-        print("Nightly info-", nightly)
+
         job_status = check_job_status(job)
+        sensitive_info_expose_status=check_if_sensitive_info_exposed(job)
+        
+        if sensitive_info_expose_status == True:
+            print("*********************************")
+            print("Build log removed")
+            print("*********************************")
+
+        print("Nightly info-", nightly)
+        
         if job_status == 'SUCCESS':
             deploy_count += 1
             e2e_count=e2e_count+1
+            if "sno" not in job:
+                print("Lease Quota-", lease)
             check_node_crash(job)
             print("This is a Green build")
         elif job_status == 'FAILURE':
