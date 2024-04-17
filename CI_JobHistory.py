@@ -169,22 +169,14 @@ def display_ci_links(config_data):
             ci_name_list.append(ci_name)
             print(j,'',ci_name)
         j=j+1
-        print(j, " All")
-
-
+        print(j, " All the above")
         option = input("Select the required ci's serial number with a space ")
-
         selected_options = option.split()
-
-   
         for ci in selected_options:
             try:
                 ci_to_int = int(ci)
-                if 0 < ci_to_int <= len(config_data):
+                if 0 < ci_to_int <= len(config_data)+1:
                     options_int_list.append(ci_to_int)
-                elif ci_to_int == len(config_data) + 1:
-                    for j in range (1, len(config_data)+1):
-                        options_int_list.append(j)
                 else:
                     return_value = "Enter the options in range of 1 to " + str(len(config_data)+1)
                     print(return_value)
@@ -199,15 +191,15 @@ def display_ci_links(config_data):
 
         selected_ci = config_vars.get('Settings', 'selected_ci')
         options_int_list = [int(value) for value in selected_ci.split(',')]
-        if len(ci_name_list)+1 in options_int_list:
-            options_int_list = [x for x in range(1, len(ci_name_list)+1)]
 
+    if len(config_data)+1 in options_int_list:
+        return config_data
 
     for i in options_int_list:
         config_temp_data = {ci_name_list[i-1]: config_data[ci_name_list[i-1]]}
         selected_config_data.update(config_temp_data)
         config_temp_data = {}
-    
+
     return selected_config_data
 
 def get_query_options():
