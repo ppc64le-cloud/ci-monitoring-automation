@@ -359,7 +359,6 @@ def get_node_status(spy_link):
     Returns:
         string: Node Status.
     '''
-    
     job_type,job_platform = job_classifier(spy_link)
     
     check_for_gather_libvirt_dir = check_if_gather_libvirt_dir_exists(spy_link,job_type)
@@ -371,7 +370,7 @@ def get_node_status(spy_link):
     
     node_log_url = PROW_VIEW_URL + spy_link[8:] + \
         "/artifacts/" + job_type +"/artifacts/oc_cmds/nodes"
-    
+ 
     try:
         node_log_response = requests.get(node_log_url, verify=False, timeout=15)
         if "NAME" in node_log_response.text:
@@ -380,7 +379,7 @@ def get_node_status(spy_link):
                 return "Some Nodes are in NotReady state"
             elif response_str.count("control-plane,master") != 3:
                 return "Not all master nodes are up and running"
-            elif (job_platform == "mce" and response_str.count("worker") != 3) or (job_platform != "mce" and response_str.count("worker-") != 2): 
+            elif ((job_platform == "mce" or "compact" in node_log_url ) and response_str.count("worker") != 3) or ((job_platform != "mce" and "compact" not in node_log_url) and response_str.count("worker-") != 2): 
                 return "Not all worker nodes are up and running"
         else:
             return "Node details not found"
