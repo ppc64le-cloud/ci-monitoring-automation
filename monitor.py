@@ -535,7 +535,7 @@ def job_classifier(spy_link):
     '''
 
     pattern = r'ocp.*?/'
-    if "mce" in spy_link:
+    if "mce" in spy_link or "capi" in  spy_link:
         pattern = r'e2e.*?/'
     match = re.search(pattern,spy_link)
 
