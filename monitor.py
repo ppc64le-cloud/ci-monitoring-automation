@@ -1015,10 +1015,12 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
                             job_log_path = ele["SpyglassLink"]
                             final_job_list.append(job_log_path)
 
-                    if next_link_match != None:
-                        next_page_spylink=next_link[35:]
-                        check=get_next_page_first_build_date(next_page_spylink,end_date)
+                    build_regex = r"/([^/?]+)\?.+"
+                    build_match = re.search(build_regex,next_link)
                     
+                    if build_match:
+                        next_page_spylink=build_match.group()
+                        check=get_next_page_first_build_date(next_page_spylink,end_date)
                         if check == True:
                             get_jobs_with_date(next_page_spylink,start_date,end_date)
                         elif check == 'ERROR':
