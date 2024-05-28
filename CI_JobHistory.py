@@ -235,6 +235,8 @@ def get_testcase_names():
             tc_list =  tc_name.split(",")
             return tc_list
 
+
+
 def main():
     parser = argparse.ArgumentParser(description='Get the job history')
     parser.add_argument('--zone', help='specify the lease/zone', type= lambda arg:arg.split(','))
@@ -273,13 +275,15 @@ def main():
             if option == '2':
                 summary_list = []
                 for ci_name,ci_link in ci_list.items():
-                    summary_list.extend(monitor.get_brief_job_info(ci_name,ci_link,start_date,end_date,zone=args.zone))
+                    spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
+                    summary_list.extend(monitor.get_brief_job_info(spy_links,ci_name,zone=args.zone))
                     monitor.final_job_list = []
                 print(tabulate(summary_list, headers='keys', tablefmt="pipe", stralign='left'))
             
             if option == '3':
                 for ci_name,ci_link in ci_list.items():
-                    monitor.get_detailed_job_info(ci_name,ci_link,start_date,end_date,zone=args.zone)
+                    spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
+                    monitor.get_detailed_job_info(spy_links,ci_name,zone=args.zone)
                     monitor.final_job_list = []
             
             if option == '4':

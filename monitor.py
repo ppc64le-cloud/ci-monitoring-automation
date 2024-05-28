@@ -246,6 +246,10 @@ def cluster_deploy_status(spy_link):
         job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/finished.json'
         if "sno" in spy_link:
             job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/upi-install-powervs-sno/finished.json'
+        
+        # temporary fix for getting cluster deployment status of jobs where clusters are deployed by upi
+        if "4.16-ocp-e2e-ovn-remote-libvirt-ppc64le" in spy_link:
+            job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/upi-install-' + job_platform +'/finished.json'
         try:
             response = requests.get(job_log_url, verify=False, timeout=15)
             if response.status_code == 200:
@@ -1015,8 +1019,11 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
                             job_log_path = ele["SpyglassLink"]
                             final_job_list.append(job_log_path)
 
-                    if next_link_match != None:
-                        next_page_spylink=next_link[35:]
+                    #build match extracts the next page spylink
+                    build_regex = r"/([^/?]+)\?.+"
+                    build_match = re.search(build_regex,next_link)
+                    if build_match != None:
+                        next_page_spylink=build_match.group()
                         check=get_next_page_first_build_date(next_page_spylink,end_date)
                     
                         if check == True:
@@ -1090,59 +1097,52 @@ def get_next_page_first_build_date(ci_next_page_spylink,end_date):
         print("Failed to extract the spy-links from spylink please check the UI!")
         return "ERROR"
     
-def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,zone=None):
+def get_brief_job_info(build_list,prow_ci_name,zone=None):
 
     """
     Gets brief information of all the jobs.
 
     Args:
+        build_list: list of builds
         prow_ci_name: CI name
-        prow_ci_link (string): CI url used to fetch the jobs
-        start_date (string, optional): Before date(Future)
-        end_date (string, optional): After date(Past)
         zone(string, optional): Cluster deployment zone
     Return:
         List(string): List of jobs with the brief information.
     """    
     
-    if start_date is not None and end_date is not None:
-        job_list = get_jobs_with_date(prow_ci_link,start_date,end_date)
-    else:
-        job_list = get_jobs(prow_ci_link)
-
-    if isinstance(job_list,str):
-        print(job_list)
+    if isinstance(build_list,str):
+        print(build_list)
         return 1
     summary_list = []   
     
     i=0
 
-    pattern_job_id =  r'/(\d+)'
+    pattern_build_id =  r'/(\d+)'
 
-    for job in job_list:
-        match = re.search(pattern_job_id, job)
-        job_id = match.group(1)
-        lease, _ = get_quota_and_nightly(job)
+    for build in build_list:
+        match = re.search(pattern_build_id, build)
+        build_id = match.group(1)
+        lease, _ = get_quota_and_nightly(build)
         if zone is not None and lease not in zone :
             continue
-        job_status = check_job_status(job)
-        cluster_status=cluster_deploy_status(job)
-        sensitive_info_expose_status=check_if_sensitive_info_exposed(job)
+        build_status = check_job_status(build)
+        cluster_status=cluster_deploy_status(build)
+        sensitive_info_expose_status=check_if_sensitive_info_exposed(build)
         i=i+1
         job_dict = {}
-        job_dict["Build"] = prow_ci_name
-        job_dict["Prow Job ID"] = job_id
+        job_dict["Job"] = prow_ci_name
+        job_dict["Prow Build ID"] = build_id
         job_dict["Install Status"] = cluster_status
         if sensitive_info_expose_status == True:
             job_dict["Lease"]="Build log removed"
         else:
             job_dict["Lease"]=lease
-        if job_status == 'SUCCESS' and "sno" not in prow_ci_link:
+        if build_status == 'SUCCESS' and "sno" not in prow_ci_name:
             job_dict["Test result"] = "PASS"
-        elif job_status == 'FAILURE' and "sno" not in prow_ci_link:
+        elif build_status == 'FAILURE' and "sno" not in prow_ci_name:
             if cluster_status == 'SUCCESS':
-                job_type,_ = job_classifier(job)
-                _, e2e_fail_test_count, error_object = get_all_failed_tc(job,job_type)
+                job_type,_ = job_classifier(build)
+                _, e2e_fail_test_count, error_object = get_all_failed_tc(build,job_type)
                 if all(value == None for value in error_object.values()):
                     if e2e_fail_test_count == 0:
                         job_dict["Test result"] = "PASS"   
@@ -1153,48 +1153,40 @@ def get_brief_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,z
         summary_list.append(job_dict)
     return summary_list
 
-def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=None,zone=None):
+def get_detailed_job_info(build_list,prow_ci_name,zone=None):
 
     """
     Prints detailed information of all the jobs.
 
     Args:
+        build_list: list of builds
         prow_ci_name: CI name
-        prow_ci_link (string): CI url used to fetch the jobs
-        start_date (string, optional): Start date(Future)
-        end_date (string, optional): End date(Past)
         zone(string, optional): Cluster deployment zone
     """    
 
-    if start_date is not None and end_date is not None:
-        job_list = get_jobs_with_date(prow_ci_link,start_date,end_date)
-    else:
-        job_list = get_jobs(prow_ci_link)
+    if isinstance(build_list,str):
+        print(build_list)
+        return 1
     
-    if len(job_list) > 0: 
+    if len(build_list) > 0: 
         print("--------------------------------------------------------------------------------------------------")
         print(prow_ci_name)
-
-    if isinstance(job_list,str):
-        print(job_list)
-        return 1
         
-
     deploy_count = 0
     e2e_count = 0
     i=0
 
-    jobs_to_deleted = []
-    for job in job_list:
-        lease, nightly = get_quota_and_nightly(job)
+    builds_to_deleted = []
+    for build in build_list:
+        lease, nightly = get_quota_and_nightly(build)
         if zone is not None and lease not in zone:
-            jobs_to_deleted.append(job)
+            builds_to_deleted.append(build)
             continue
         i=i+1
-        print(i,"Job link: https://prow.ci.openshift.org/"+job)
+        print(i,"Job link: https://prow.ci.openshift.org/"+build)
 
-        job_status = check_job_status(job)
-        sensitive_info_expose_status=check_if_sensitive_info_exposed(job)
+        build_status = check_job_status(build)
+        sensitive_info_expose_status=check_if_sensitive_info_exposed(build)
         
         if sensitive_info_expose_status == True:
             print("*********************************")
@@ -1203,26 +1195,26 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
 
         print("Nightly info-", nightly)
         
-        if job_status == 'SUCCESS':
+        if build_status == 'SUCCESS':
             deploy_count += 1
             e2e_count=e2e_count+1
-            if "sno" not in job:
+            if "sno" not in build:
                 print("Lease Quota-", lease)
-            check_node_crash(job)
-            print("This is a Green build")
-        elif job_status == 'FAILURE':
-            cluster_status=cluster_deploy_status(job)
-            if "sno" not in job:
+            check_node_crash(build)
+            print("Build Passed")
+        elif build_status == 'FAILURE':
+            cluster_status=cluster_deploy_status(build)
+            if "sno" not in build:
                 print("Lease Quota-", lease)    
-                node_status = get_node_status(job)
+                node_status = get_node_status(build)
                 print(node_status)
-            check_node_crash(job)
+            check_node_crash(build)
 
             if cluster_status == 'SUCCESS':
                 deploy_count += 1
-                if "sno" not in prow_ci_link:
-                    job_type,_ = job_classifier(job)
-                    tc_exe_status=print_all_failed_tc(job,job_type)
+                if "sno" not in prow_ci_name:
+                    job_type,_ = job_classifier(build)
+                    tc_exe_status=print_all_failed_tc(build,job_type)
                     if tc_exe_status=="SUCCESS":
                         e2e_count=e2e_count+1
 
@@ -1232,12 +1224,12 @@ def get_detailed_job_info(prow_ci_name,prow_ci_link,start_date=None,end_date=Non
             elif cluster_status == 'ERROR':
                 print('Unable to get cluster status please check prowCI UI ')
         else:
-            print(job_status)
+            print(build_status)
 
         print("\n")
         
-    job_list = list(set(job_list) - set(jobs_to_deleted))
-    if len(job_list) != 0:
-        print ("\n{}/{} deploys succeeded".format(deploy_count, len(job_list)))
-        print ("{}/{} e2e tests succeeded".format(e2e_count, len(job_list)))
+    build_list = list(set(build_list) - set(builds_to_deleted))
+    if len(build_list) != 0:
+        print ("\n{}/{} deploys succeeded".format(deploy_count, len(build_list)))
+        print ("{}/{} e2e tests succeeded".format(e2e_count, len(build_list)))
         print("--------------------------------------------------------------------------------------------------")

@@ -20,18 +20,20 @@ def main():
     elif args.job_type == 'z':
         config_file = 'z_periodic.json'
     elif args.job_type == 'pa':
-        config_file = 'p_auxillary.json'
+        config_file = 'p_auxillary.json' 
     
     monitor.PROW_URL = monitor.set_prow_url(args.job_type)
     config_data = monitor.load_config(config_file)
     if args.info_type == "brief":
         summary_list = []
         for ci_name,ci_link in config_data.items():
-            summary_list.extend(monitor.get_brief_job_info(ci_name,ci_link,zone=args.zone))
+            build_list = monitor.get_jobs(ci_link)
+            summary_list.extend(monitor.get_brief_job_info(build_list,ci_name,zone=args.zone))
         print(tabulate(summary_list, headers='keys', tablefmt="pipe", stralign='left'))
     elif args.info_type == "detailed":
         for ci_name,ci_link in config_data.items():
-            monitor.get_detailed_job_info(ci_name,ci_link,zone=args.zone)
+            build_list = monitor.get_jobs(ci_link)
+            monitor.get_detailed_job_info(build_list,ci_name,zone=args.zone)
 
 if __name__ == "__main__":
     main()
