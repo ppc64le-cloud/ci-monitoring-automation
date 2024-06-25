@@ -988,6 +988,7 @@ def get_jobs_with_date(prowci_url,start_date,end_date):
             td_element2 = str(td_element)
             next_link_pattern = r'/job[^>"]*'
             next_link_match = re.search(next_link_pattern,td_element2)
+            next_link = ''
             if next_link_match != None:
                 next_link = next_link_match.group()
 
