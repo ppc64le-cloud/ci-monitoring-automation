@@ -216,17 +216,14 @@ def cluster_deploy_status(spy_link):
 
         try:
             response = requests.get(mce_install_log_url, verify=False, timeout=15)
-            if response.status_code == 200:
-                
+            if response.status_code == 200:                
                 cluster_status = json.loads(response.text)
                 cluster_result = "MCE-INSTALL "+ cluster_status["result"]
                 if cluster_status["result"] == "SUCCESS":
                         # check mce-power-create status also
-                    mce_power_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/hypershift-mce-power-create/finished.json'
-
+                    mce_power_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/hypershift-mce-power-create-nodepool/finished.json'
                     response = requests.get(mce_power_log_url, verify=False, timeout=15)
                     if response.status_code == 200:
-            
                         cluster_status = json.loads(response.text)
                         cluster_result += "\nMCE-POWER-CREATE "+ cluster_status["result"]
                         if cluster_status["result"] == "SUCCESS":
