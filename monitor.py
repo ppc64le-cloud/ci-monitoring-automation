@@ -1122,7 +1122,7 @@ def get_brief_job_info(build_list,prow_ci_name,zone=None):
     
     if isinstance(build_list,str):
         print(build_list)
-        return 1
+        return []
     summary_list = []   
     
     i=0
