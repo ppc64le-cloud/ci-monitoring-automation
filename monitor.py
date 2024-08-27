@@ -113,6 +113,7 @@ def get_jobs(prow_link):
                     return jobs_run_today                    
         else:
             return "Failed to get the prowCI response"
+        
     except requests.Timeout as e:
         return "Request timed out"
     except requests.RequestException as e:
@@ -240,13 +241,18 @@ def cluster_deploy_status(spy_link):
         except json.JSONDecodeError as e:
             return 'ERROR'
     else:
+        pattern=r"(\d+\.\d+)"
+        match=re.search(pattern,spy_link[8:])
+        version=float(match.group(0))
+        if "upgrade" in spy_link:
+            version=version-0.01 
         job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/finished.json'
         if "sno" in spy_link:
             job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/upi-install-powervs-sno/finished.json'
-        
-        # temporary fix for getting cluster deployment status of jobs where clusters are deployed by upi
-        if "4.16-ocp-e2e-ovn-remote-libvirt-ppc64le" in spy_link:
+
+        if version>=4.16:
             job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/upi-install-' + job_platform +'/finished.json'
+
         try:
             response = requests.get(job_log_url, verify=False, timeout=15)
             if response.status_code == 200:
@@ -565,6 +571,7 @@ def job_classifier(spy_link):
     if match:
         job_type = match.group(0)
         job_type = job_type.rstrip('/')
+    
     job_platform = "mce"
     if spy_link.find("powervs") != -1:
         job_platform = "powervs"
@@ -572,6 +579,7 @@ def job_classifier(spy_link):
         job_platform = "libvirt"
     elif spy_link.find("sno") != -1:
         job_platform = "sno"
+    
     return job_type,job_platform
 
 
