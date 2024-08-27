@@ -1,5 +1,4 @@
 {
-    "4.11 libvirt": "periodic-ci-openshift-multiarch-master-nightly-4.11-ocp-e2e-remote-libvirt-ppc64le",
     "4.11 to 4.12 upgrade": "periodic-ci-openshift-multiarch-master-nightly-4.12-upgrade-from-nightly-4.11-ocp-ovn-remote-libvirt-ppc64le",
     "4.12 libvirt": "periodic-ci-openshift-multiarch-master-nightly-4.12-ocp-e2e-ovn-remote-libvirt-ppc64le",
     "4.12 to 4.13 upgrade": "periodic-ci-openshift-multiarch-master-nightly-4.13-upgrade-from-nightly-4.12-ocp-ovn-remote-libvirt-ppc64le",

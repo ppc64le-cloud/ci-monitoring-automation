@@ -113,6 +113,7 @@ def get_jobs(prow_link):
                     return jobs_run_today                    
         else:
             return "Failed to get the prowCI response"
+        
     except requests.Timeout as e:
         return "Request timed out"
     except requests.RequestException as e:
