@@ -11,6 +11,10 @@ def filter_latest_ci_lv1(config_data,n_build):
         tc_failure_jobs = []
         huge_tc_failure_jobs = []
         job_list = monitor.get_n_recent_jobs(ci_link,n_build)
+        print(job_list)
+        if isinstance(job_list, str):
+            print(job_list + " for ", ci_name)
+            return updated_ci_dict
         for job in job_list:
             cluster_status=monitor.cluster_deploy_status(job)
             job_type,_=monitor.job_classifier(job)

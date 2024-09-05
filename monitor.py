@@ -562,12 +562,11 @@ def job_classifier(spy_link):
         job_type(string): It is a important keyword used while constructing url to access the artifacts.
         job_platform(string): The infrastructure where the cluster is deployed (ex: libvirt, powervs etc).
     '''
-
+    job_type = ""
     pattern = r'ocp.*?/'
-    if "mce" in spy_link or "capi" in  spy_link:
+    if "mce" in spy_link:
         pattern = r'e2e.*?/'
     match = re.search(pattern,spy_link)
-
     if match:
         job_type = match.group(0)
         job_type = job_type.rstrip('/')
