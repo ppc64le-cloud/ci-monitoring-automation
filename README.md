@@ -81,7 +81,7 @@ Create a virtualenv if required and install required packages using "pip install
 
 4. **aggregate.py:** The aggregate.py script gets detailed information of all the builds which have run using the provided nightly image. 
 
-    ```python3 tracker.py``` This script requires the following input
+    ```python3 aggregate.py``` This script requires the following input
 
     1. selected_ci: Jobs from where to fetch the builds.
     2. nightly: Name of the Release image.
