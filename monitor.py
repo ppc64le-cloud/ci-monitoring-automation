@@ -470,9 +470,6 @@ def get_nightly(build_log_url,build_log_response, job_platform):
         nightly_log_re = re.compile('(Resolved release {}-latest to (\S+))'.format(job_platform), re.MULTILINE|re.DOTALL)
         nightly_log_match = nightly_log_re.search(build_log_response.text)
         if nightly_log_match is None:
-            if job_platform == 'multi':
-                nightly = "Failed to fetch nightly image"
-            else:
                 rc_nightly_log_re = re.compile('(Using explicitly provided pull-spec for release {}-latest \((\S+)\))'.format(job_platform), re.MULTILINE|re.DOTALL)
                 rc_nightly_log_match = rc_nightly_log_re.search(build_log_response.text)
                 if rc_nightly_log_match is None:
@@ -536,6 +533,15 @@ def get_quota_and_nightly(spy_link):
             job_platform+="-s390x"
             lease = get_lease(build_log_response,job_platform )
             nightly = get_nightly(build_log_url,build_log_response, 's390x')
+        elif "multi" in spy_link:
+            if "powervs" in spy_link:
+                job_platform = "powervs"
+                job_platform+="-[1-9]"
+                lease=get_lease(build_log_response,job_platform)
+            else:
+                job_platform="multi"
+                lease=get_lease(build_log_response,'libvirt-ppc64le')
+            nightly = get_nightly(build_log_url,build_log_response, "multi") 
 
         elif "mce" in spy_link:
             job_platform = "aws"
