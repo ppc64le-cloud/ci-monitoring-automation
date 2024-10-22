@@ -246,11 +246,12 @@ def cluster_deploy_status(spy_link):
         version=float(match.group(0))
         if "upgrade" in spy_link:
             version=version-0.01 
+
         job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/ipi-install-' + job_platform +'-install/finished.json'
         if "sno" in spy_link:
             job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/upi-install-powervs-sno/finished.json'
-
-        if version>=4.16:
+        #Only 4.17 and above libvirt uses upi-installation.
+        if version>=4.16 and job_platform != "powervs":
             job_log_url = PROW_VIEW_URL + spy_link[8:] + '/artifacts/' + job_type + '/upi-install-' + job_platform +'/finished.json'
 
         try:
@@ -568,15 +569,23 @@ def job_classifier(spy_link):
         job_type(string): It is a important keyword used while constructing url to access the artifacts.
         job_platform(string): The infrastructure where the cluster is deployed (ex: libvirt, powervs etc).
     '''
-
+    #Artifact link for libvirt: test-platform-results/logs/periodic-ci-openshift-multiarch-master-nightly-4.17-ocp-e2e-ovn-remote-libvirt-ppc64le/1847061335720857600/artifacts/ocp-e2e-ovn-remote-libvirt-ppc64le/
+    #Artifact link for powervs: test-platform-results/logs/periodic-ci-openshift-multiarch-master-nightly-4.17-ocp-e2e-ovn-ppc64le-powervs-capi/1820746900182142976/artifacts/ocp-e2e-ovn-ppc64le-powervs-capi/
+    #Artifact link for upgrade: test-platform-results/logs/periodic-ci-openshift-multiarch-master-nightly-4.17-upgrade-from-nightly-4.16-ocp-ovn-remote-libvirt-multi-p-p/1846295088968241152/artifacts/ocp-ovn-remote-libvirt-multi-p-p/
+    #Artifact link for heavybuild: test-platform-results/logs/periodic-ci-openshift-multiarch-master-nightly-4.16-ocp-heavy-build-ovn-remote-libvirt-ppc64le/1846642613847855104/artifacts/ocp-heavy-build-ovn-remote-libvirt-ppc64le/
+    #Artifact directory for all libvirt,powervs,heavybuild and upgrade jobs starts with "ocp", so to identify the job_type used the regex 'ocp.*?/'
     pattern = r'ocp.*?/'
-    if "mce" in spy_link or "capi" in  spy_link:
+
+    #Artifact link for mce /test-platform-results/logs/periodic-ci-openshift-hypershift-release-4.14-periodics-mce-e2e-mce-power-conformance/1847155042210025472/artifacts/e2e-mce-power-conformance/
+    #mce jobs artifact directory is e2e-mce-power-conformance, so to identify the job_type used the regex 'e2e.*?/'
+    if "mce" in spy_link:
         pattern = r'e2e.*?/'
     match = re.search(pattern,spy_link)
 
     if match:
         job_type = match.group(0)
         job_type = job_type.rstrip('/')
+
     
     job_platform = "mce"
     if spy_link.find("powervs") != -1:
@@ -859,21 +868,24 @@ def get_all_failed_tc(spylink,jobtype):
     conformance_failed_tc_count = len(failed_tc["conformance"])
     symptom_failed_tc_count = len(failed_tc["symptom_detection"])
 
-    if ("4.15" in spylink or "4.16" in spylink) and (not "mce" in spylink):
+    #  Monitor test failure details are fetched from the "junit_e2e__*.xml" file for 4.14,4.13 and mce job runs.
+    #  For other job runs monitor test failure details are fetched from "test-failures-summary_monitor_*.json" file.
+    if ("4.14" not in spylink and  "4.13" not in spylink) and (not "mce" in spylink):
         monitor, monitor_err_obj=get_failed_monitor_testcases(spylink,jobtype)
         failed_tc = {"conformance": conformance, "monitor": monitor, "symptom_detection": symptom_detection}
         monitor_failed_tc_count = len(failed_tc["monitor"])
-    elif "4.14" in spylink or "mce" in spylink:
+    elif "4.14" in spylink or "mce" in spylink or "4.13" in spylink:
         monitor, monitor_err_obj = get_failed_monitor_testcases_from_xml(spylink,jobtype)
         failed_tc = {"conformance": conformance, "monitor": monitor, "symptom_detection": symptom_detection}
         monitor_failed_tc_count = len(failed_tc["monitor"])
-    
+
     failed_tc_count=conformance_failed_tc_count+symptom_failed_tc_count+monitor_failed_tc_count
     error_object = {"conformance": conformance_error_obj, "monitor": monitor_err_obj, "symptom_detection": symptom_error_obj}
 
     return failed_tc,failed_tc_count,error_object
 
 def check_ts_exe_status(spylink,jobtype):
+
     '''
     Checks conformance Test suite execution status.
 
