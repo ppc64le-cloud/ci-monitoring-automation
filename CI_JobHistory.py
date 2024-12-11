@@ -145,7 +145,7 @@ def get_testcase_failure(spylinks, zone, tc_name):
     print("--------------------------------------------------------------------------------------------------")
     print("\n")
 
-def display_ci_links(config_data,job_platform):
+def display_ci_links(config_data,filter):
 
     '''
     Gets selected CI input.
@@ -165,11 +165,11 @@ def display_ci_links(config_data,job_platform):
 
     if JENKINS == "False":
         for ci_name in config_data.keys():
-            if job_platform[0]=='All':
+            if filter[0]=='All':
                 j=j+1
                 ci_name_list.append(ci_name)
                 print(j,"",ci_name)
-            elif any(w in ci_name for w in job_platform):
+            elif any(w in ci_name for w in filter):
                 j=j+1
                 ci_name_list.append(ci_name)
                 print(j,"",ci_name)
@@ -248,9 +248,9 @@ def main():
     parser = argparse.ArgumentParser(description='Get the job history')
     parser.add_argument('--zone', help='specify the lease/zone', type= lambda arg:arg.split(','))
     parser.add_argument('--job_type', default='p', choices=['p','z','pa'], help= 'Specify the CI job type (Power(p) or s390x(z) or Power Auxillary(pa)), default is p')
-    parser.add_argument('--job_platform',default='All',type= lambda arg:arg.split(','), help='Specify the job_platform to fetch jobs, supported values are heavy build / libvirt / powervs / upgrade')
+    parser.add_argument('--filter',default='All',type= lambda arg:arg.split(','), help='Specify the filter string to fetch jobs (Example heavy build / libvirt / powervs / upgrade / 4.14 / 4.15 / 4.16 / 4.17/ 4.18 )')
     args = parser.parse_args()
-    job_platform=args.job_platform
+    filter=args.filter
 
     if args.job_type == 'p':
         config_file = 'p_periodic.json'
@@ -262,7 +262,7 @@ def main():
     monitor.PROW_URL = monitor.set_prow_url(args.job_type)
     config_data = monitor.load_config(config_file)
 
-    ci_list = display_ci_links(config_data,job_platform)
+    ci_list = display_ci_links(config_data,filter)
     if isinstance(ci_list,dict):
         start_date,end_date = get_date_input()
         if start_date != None and end_date != None:
