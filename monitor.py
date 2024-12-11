@@ -11,6 +11,33 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 PROW_URL = ""
 PROW_VIEW_URL = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs"
 final_job_list=[]
+RELEASE_URL = "https://ppc64le.ocp.releases.ci.openshift.org/releasestream/4-stable-ppc64le/release/"
+
+def fetch_release_date(release):
+    '''
+    Returns the created date of release
+    '''
+    url = RELEASE_URL + release
+    try:
+        response = requests.get(url, verify=False, timeout=15)
+        if response.status_code == 200:
+             soup = BeautifulSoup(response.text, 'html.parser')
+             p_elements = soup.find_all("p")
+             for p in p_elements:
+                p_ele = p.string
+                if p_ele:
+                    if "Created:" in p_ele:
+                        start_date = p_ele.split(" ")[1]+" "+p_ele.split(" ")[2]
+                        break
+             return start_date
+        else:
+            return "failed to get the release page"
+    except requests.Timeout as e:
+        return "Request timed out"
+    except requests.RequestException as e:
+        return "Error while sending request to url"
+    except json.JSONDecodeError as e:
+        return "Failed to extract the spy-links"
 
 def set_prow_url(ci_job_type: str)->str:
     '''
@@ -47,7 +74,7 @@ def load_config(config_file):
         sys.exit(1)
 
 def get_current_date():
-    return datetime.now().date()
+    return datetime.now()
 
 def parse_job_date(date):
 
@@ -62,8 +89,7 @@ def parse_job_date(date):
     '''
     
     parse_date=datetime.strptime(date,"%Y-%m-%dT%H:%M:%SZ")
-    job_run_date=parse_date.date()
-    return job_run_date
+    return parse_date
 
 
 def get_jobs(prow_link):

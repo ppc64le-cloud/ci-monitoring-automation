@@ -84,22 +84,22 @@ def get_job_name():
 def get_builds_with_same_nightly(job_name,nightly_image):
     builds=[]
     agg_builds = []
-    pattern = r'\d{4}-\d{2}-\d{2}'
+    pattern = r'\d{4}-\d{2}-\d{2}-\d{6}'
     match = re.search(pattern,nightly_image)
     
     if match != None:
         date_str = match.group()
-        nightly_date = datetime.strptime(date_str,"%Y-%m-%d").date()
-        current_date = datetime.now().date()
+        nightly_date = datetime.strptime(date_str,"%Y-%m-%d-%H%M%S")
+        current_date = datetime.now()
         builds=monitor.get_jobs_with_date(job_name,current_date,nightly_date)
         for spylink in reversed(builds):
             ng = ""
             _, ng = monitor.get_quota_and_nightly(spylink)
-            pattern_1 = r'\d{4}-\d{2}-\d{2}'
+            pattern_1 = r'\d{4}-\d{2}-\d{2}-\d{6}'
             match_1 = re.search(pattern_1,ng)
             if match_1 != None:
                 date_str_1 = match_1.group()
-                ng_date = datetime.strptime(date_str_1,"%Y-%m-%d").date()
+                ng_date = datetime.strptime(date_str_1,"%Y-%m-%d-%H%M%S")
                 if ng_date > nightly_date:
                     break
                 else:

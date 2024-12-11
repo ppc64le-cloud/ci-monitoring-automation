@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 import urllib3
 from tabulate import tabulate
 import re
-from datetime import datetime
+from datetime import datetime,timedelta
 import monitor
 import argparse
 import configparser
@@ -15,6 +15,36 @@ config_vars.read('config.ini')
 
 JENKINS = config_vars.get('Settings', 'JENKINS')
 
+def get_release_date():
+    '''
+    Fetch release start date and end date
+    Returns:
+        Date: Start date
+        Date: End date
+    '''
+    release = input("Enter the release: ") #release that needs to be checked
+    assert len(release.strip()) != 0, "Release value should not be empty"
+    nxt_rls = input("Enter the next release (provide latest if no next release): ") #next release or latest
+    assert len(nxt_rls.strip()) != 0 , "Next release value should not be empty"
+    r = re.compile(r"^\d*[.,]?\d*$")
+    if re.match(r,release)==False:
+        print("Enter valid release version")
+
+    try:
+
+        release_date_str = monitor.fetch_release_date(release)
+        release_date = datetime.strptime(release_date_str,"%Y-%m-%d  %H:%M:%S")
+
+        if nxt_rls != "latest":
+            nxt_rls_str = monitor.fetch_release_date(nxt_rls)
+            nxt_rls_date = datetime.strptime(nxt_rls_str,"%Y-%m-%d  %H:%M:%S")
+        else:
+            nxt_rls_date=datetime.now()
+    except ValueError:
+        print("Invalid date format")
+        return None
+
+    return nxt_rls_date,release_date
 
 
 def get_date_input():
@@ -33,17 +63,13 @@ def get_date_input():
     elif JENKINS == "True":
         date_str_1 = config_vars.get('Settings', 'before_date')
         date_str_2 = config_vars.get('Settings', 'after_date')
-
     try:
         start_date = datetime.strptime(date_str_1,"%Y-%m-%d")
         end_date = datetime.strptime(date_str_2,"%Y-%m-%d")
-        start_date = start_date.date()
-        end_date = end_date.date()
         return start_date,end_date
     except ValueError:
         print("Invalid date format")
         return None
-
 
 def check_for_node_crashes(job_list, zone):
     """
@@ -218,6 +244,7 @@ def get_query_options():
         print("4. Failed testcases")
         print("5. Get builds with testcase failure")
         print("6. Get testcase failure frequency")
+        print("7. Get build based on release ")
         option = input("Enter the option: ")
 
     elif JENKINS == "True":
@@ -264,9 +291,14 @@ def main():
 
     ci_list = display_ci_links(config_data,filter)
     if isinstance(ci_list,dict):
-        start_date,end_date = get_date_input()
+        option = get_query_options()
+
+        if option == '7':
+            start_date,end_date = get_release_date()
+        else:
+            start_date,end_date = get_date_input()
+
         if start_date != None and end_date != None:
-            option = get_query_options()
             print("Checking runs from",end_date,"to",start_date)
     
             if option == '1':
@@ -336,6 +368,11 @@ def main():
                     spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
                     print(len(spy_links),"builds have run in the date range of",start_date,"to",end_date)
                     print_tc_frequency(spy_links,zone=args.zone,tc_name=tc_list)
+                    monitor.final_job_list = []
+            if option == '7':
+                for ci_name,ci_link in ci_list.items():
+                    spy_links = monitor.get_jobs_with_date(ci_link,start_date,end_date)
+                    monitor.get_detailed_job_info(spy_links,ci_name,zone=args.zone)
                     monitor.final_job_list = []
 
 if __name__ == "__main__":
