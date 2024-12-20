@@ -129,10 +129,10 @@ def get_jobs(prow_link):
                 if match:
                     all_jobs=match.group(1)
                     all_jobs_parsed=json.loads(all_jobs)
-                    current_date=get_current_date()
+                    current_date=get_current_date().date()
                     jobs_run_today = []
                     for ele in all_jobs_parsed:
-                        job_time=parse_job_date(ele["Started"])
+                        job_time=parse_job_date(ele["Started"]).date()
                         if job_time == current_date and ele["Result"] != "PENDING":
                             job_log_path = ele["SpyglassLink"]
                             jobs_run_today.append(job_log_path)
