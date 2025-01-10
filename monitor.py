@@ -364,6 +364,23 @@ def check_if_gather_libvirt_dir_exists(spy_link,job_type):
         return "Request timed out"
     except requests.RequestException:
         return "Error while sending request to url"
+    
+#This is to check for hypervisor error
+def check_hypervisor_error(spy_link):
+    build_log_url = constants.PROW_VIEW_URL + spy_link[8:] + '/build-log.txt'
+    try:
+        response = requests.get(build_log_url, verify=False, timeout=15)
+        hypervisor_re = re.compile('error: failed to connect to the hypervisor')
+        hypervisor_re_match = hypervisor_re.search(response.text)
+        if hypervisor_re_match is not None:
+            return True
+        else:
+            return False
+    except requests.Timeout:
+        return "Request timed out"
+    except requests.RequestException:
+        return "Error while sending request to url"
+
 
 #This is a fix to check for sensitive information expose error.
 def check_if_sensitive_info_exposed(spy_link):
@@ -1292,8 +1309,16 @@ def get_detailed_job_info(build_list,prow_ci_name,zone=None):
 
             elif cluster_status == 'FAILURE':
                 print("Cluster Creation Failed")
+                hypervisor_error_status = check_hypervisor_error(build)
+                if hypervisor_error_status:
+                    print("Failed to connect to the hypervisor")
+                
 
             elif cluster_status == 'ERROR':
+                hypervisor_error_status = check_hypervisor_error(build)
+                if hypervisor_error_status:
+                    print("Cluster Creation Failed")
+                    print("Failed to connect to the hypervisor")
                 print('Unable to get cluster status please check prowCI UI ')
         else:
             print(build_status)
